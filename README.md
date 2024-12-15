@@ -137,6 +137,36 @@ cargo run --release -- examples/tri-klops.jpg \
   <tbody>
     <tr>
       <td>
+          <img src="examples/zardoz.jpg" alt="Reference Image">
+      </td>
+      <td>
+          <img src="examples/zardoz--alg_ssim--rng_1734233597--res_512--tri_512--gen_512--pop_128--sel_64--mut_0.10--deg_0.00.svg" alt="Output Image" width="256">
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+```
+cargo run --release -- examples/zardoz.jpg \
+    --image-size 512 \
+    --num-triangles 512 \
+    --num-generations 512 \
+    --population-size 128 \
+    --num-selected 64 \
+    --mutation-rate 0.10 \
+    --algorithm ssim
+```
+
+<table>
+  <thead>
+    <tr>
+      <th>Reference Image</th>
+      <th>Output Image</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
           <img src="examples/castle.jpg" alt="Reference Image">
       </td>
       <td>
