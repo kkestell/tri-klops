@@ -4,73 +4,38 @@ Tri-Klops is a Rust program that approximates a reference image using a set numb
 
 ![Example](examples/kyle--alg_mse--rng_0--res_256--tri_512--gen_512--pop_512--sel_256--mut_0.10--deg_10.00.svg)
 
-## Features
-
-- **Evolutionary Algorithm**: Uses genetic algorithms to create images from triangles
-- **Fitness Evaluation**: Supports two metrics:
-  - **Mean Squared Error (MSE)**
-  - **Structural Similarity Index Measure (SSIM)**
-- **Parallel Processing**: Melt your CPU!
-- **Customizable Parameters**: Control the number of triangles, generations, population size, mutation rate, and more
-- **SVG Output**: Generates scalable vector graphics output
-- **Degeneracy Control**: Optional threshold to prevent degenerate triangles
-- **Progressive Saving**: Configurable frequency for saving intermediate results
-
-## Dependencies
-
-- Rust (stable)
-- Crates
-  - `clap`: Command-line argument parsing
-  - `image`: Image processing
-  - `imageproc`: Drawing operations
-  - `indicatif`: Progress bars
-  - `rand`: Random number generation
-  - `rayon`: Parallel processing
-  - `svg`: SVG file generation
-
-## Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/kkestell/tri-klops.git
-cd tri-klops
-```
-
-Build the project:
-
-```bash
-cargo build --release
-```
-
 ## Usage
 
-### Command-Line Arguments
+```
+triklops [OPTIONS] <REFERENCE_IMAGE_PATH>
 
-<dl>
-  <dt><code>reference_image_path</code></dt>
-  <dd>Path to the reference image file. Required.</dd>
-  <dt><code>--image-size</code></dt>
-  <dd>Width and height of the internal canvas. Default: 256</dd>
-  <dt><code>--num-triangles</code></dt>
-  <dd>Total number of triangles to use in the approximation. Default: 512</dd>
-  <dt><code>--num-generations</code></dt>
-  <dd>Number of generations to evolve each triangle. Default: 512</dd>
-  <dt><code>--population-size</code></dt>
-  <dd>Size of the population in each generation. Default: 512</dd>
-  <dt><code>--num-selected</code></dt>
-  <dd>Number of top individuals selected per generation. Default: 256</dd>
-  <dt><code>--mutation-rate</code></dt>
-  <dd>Mutation rate for the evolutionary algorithm (between 0 and 1). Default: 0.1</dd>
-  <dt><code>--seed</code></dt>
-  <dd>Seed for the random number generator. Optional.</dd>
-  <dt><code>--algorithm</code></dt>
-  <dd>Fitness evaluation algorithm to use ("ssim" or "mse"). Default: "mse"</dd>
-  <dt><code>--degeneracy-threshold</code></dt>
-  <dd>Minimum angle threshold for triangle vertices in degrees. Optional.</dd>
-  <dt><code>--save-frequency</code></dt>
-  <dd>Number of triangles between intermediate saves. When not specified, defaults to saving every 10 triangles. Set to 0 to disable intermediate saves.</dd>
-</dl>
+Arguments:
+  <REFERENCE_IMAGE_PATH>  Path to the reference image
+
+Options:
+      --image-size <IMAGE_SIZE>
+          Image size (width and height) [default: 256]
+      --num-triangles <NUM_TRIANGLES>
+          Number of triangles [default: 512]
+      --num-generations <NUM_GENERATIONS>
+          Number of generations [default: 512]
+      --population-size <POPULATION_SIZE>
+          Population size [default: 512]
+      --num-selected <NUM_SELECTED>
+          Number of individuals selected per generation [default: 256]
+      --mutation-rate <MUTATION_RATE>
+          Mutation rate [default: 0.1]
+      --seed <SEED>
+          Seed for the random number generator (optional)
+      --degeneracy-threshold <DEGENERACY_THRESHOLD>
+          Degeneracy threshold (optional)
+      --algorithm <ALGORITHM>
+          Fitness evaluation algorithm ("ssim" or "mse") [default: mse] [possible values: ssim, mse]
+      --save-frequency <SAVE_FREQUENCY>
+          Save frequency (optional)
+  -h, --help
+          Print help
+```
 
 ### Example Commands
 
@@ -225,41 +190,10 @@ The program generates an SVG file with the naming format:
 {input_filename}--alg_{algorithm}--rng_{seed}--res_{image-size}--tri_{num-triangles}--gen_{num-generations}--pop_{population-size}--sel_{num-selected}--mut_{mutation-rate}--deg_{degeneracy-threshold}.svg
 ```
 
-## How It Works
-
-The program uses an evolutionary algorithm to approximate the reference image with triangles:
-
-For each new triangle:
-
-- Generates a random population of triangles
-- Evaluates each triangle's fitness using MSE or SSIM
-- Selects the best performers for breeding
-- Creates new generations through crossover and mutation
-- Optional: Checks for and penalizes degenerate triangles
-
-After evolving each triangle:
-
-- Adds the best-performing triangle to the canvas
-- Updates the SVG output
-- Optionally saves intermediate results based on save frequency
-
-## Fitness Algorithms
-
-### MSE (Mean Squared Error)
-
-- Measures average pixel-wise difference
-- Faster computation
-- Good for general purpose use
-
-### SSIM (Structural Similarity Index)
-
-- Considers image structure and perception
-- More computationally intensive
-- Often produces more visually pleasing results
-
 ## License
 
-This project is licensed under the Zero-Clause BSD License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Zero-Clause BSD License.
+
 ```
 Permission to use, copy, modify, and/or distribute this software for
 any purpose with or without fee is hereby granted.
