@@ -1,6 +1,6 @@
 # Tri-Klops
 
-Tri-Klops is a Rust program that approximates a reference image using a set number of triangles. It uses an evolutionary algorithm to iteratively add triangles to a canvas, evolving each one to best match the reference image.
+Create images from triangles using a genetic algorithm.
 
 ![Example](examples/kyle--alg_mse--rng_0--res_256--tri_512--gen_512--pop_512--sel_256--mut_0.10--deg_10.00.svg)
 
@@ -37,7 +37,7 @@ Options:
           Print help
 ```
 
-### Example Commands
+### Examples
 
 Basic usage with default settings:
 
@@ -180,29 +180,4 @@ cargo run --release -- examples/kanagawa.jpg \
     --num-selected 64 \
     --mutation-rate 0.10 \
     --algorithm ssim
-```
-
-### Output Files
-
-The program generates an SVG file with the naming format:
-
-```
-{input_filename}--alg_{algorithm}--rng_{seed}--res_{image-size}--tri_{num-triangles}--gen_{num-generations}--pop_{population-size}--sel_{num-selected}--mut_{mutation-rate}--deg_{degeneracy-threshold}.svg
-```
-
-## License
-
-This project is licensed under the Zero-Clause BSD License.
-
-```
-Permission to use, copy, modify, and/or distribute this software for
-any purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
-WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
-FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
-DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
-AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
-OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
