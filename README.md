@@ -2,7 +2,9 @@
 
 Create images from triangles using a genetic algorithm.
 
-![Example](examples/kyle--alg_mse--rng_0--res_256--tri_512--gen_512--pop_512--sel_256--mut_0.10--deg_10.00.svg)
+<p align="center">
+    <img alt="Tri-Klops" src="assets/icon.png">
+</p>
 
 ## Usage
 
@@ -60,7 +62,7 @@ cargo run --release -- path/to/reference_image.jpg \
   --save-frequency 20
 ```
 
-### Examples
+### More Examples
 
 <table>
   <thead>
