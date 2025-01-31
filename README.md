@@ -9,32 +9,36 @@ Create images from triangles using a genetic algorithm.
 ## Usage
 
 ```
-triklops [OPTIONS] <REFERENCE_IMAGE_PATH>
+Tri-Klops
+
+Usage: triklops.exe [OPTIONS] <REFERENCE_IMAGE_PATH>
 
 Arguments:
   <REFERENCE_IMAGE_PATH>  Path to the reference image
 
 Options:
-      --image-size <IMAGE_SIZE>
-          Image size (width and height) [default: 256]
-      --num-triangles <NUM_TRIANGLES>
+  -o, --output <OUTPUT_PATH>
+          Output path (optional)
+  -t, --num-triangles <NUM_TRIANGLES>
           Number of triangles [default: 512]
-      --num-generations <NUM_GENERATIONS>
+  -a, --algorithm <ALGORITHM>
+          Fitness evaluation algorithm [default: mse] [possible values: ssim, mse]
+  -i, --image-size <IMAGE_SIZE>
+          Image size (width and height) [default: 256]
+  -g, --num-generations <NUM_GENERATIONS>
           Number of generations [default: 512]
-      --population-size <POPULATION_SIZE>
-          Population size [default: 512]
-      --num-selected <NUM_SELECTED>
-          Number of individuals selected per generation [default: 256]
-      --mutation-rate <MUTATION_RATE>
+  -p, --population-size <POPULATION_SIZE>
+          Population size [default: 256]
+  -s, --num-selected <NUM_SELECTED>
+          Number of individuals selected per generation [default: 128]
+  -m, --mutation-rate <MUTATION_RATE>
           Mutation rate [default: 0.1]
-      --seed <SEED>
-          Seed for the random number generator (optional)
-      --degeneracy-threshold <DEGENERACY_THRESHOLD>
+  -d, --degeneracy-threshold <DEGENERACY_THRESHOLD>
           Degeneracy threshold (optional)
-      --algorithm <ALGORITHM>
-          Fitness evaluation algorithm ("ssim" or "mse") [default: mse] [possible values: ssim, mse]
-      --save-frequency <SAVE_FREQUENCY>
-          Save frequency (optional)
+  -f, --save-frequency <SAVE_FREQUENCY>
+          Save frequency [default: 1]
+  -r, --seed <SEED>
+          Seed for the random number generator (optional)
   -h, --help
           Print help
 ```
