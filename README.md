@@ -6,12 +6,24 @@ Create images from triangles using a genetic algorithm.
     <img alt="Tri-Klops" src="assets/icon.png">
 </p>
 
+## Installation
+
+### Windows
+
+Download the latest release from the [releases page](https://github.com/kkestell/tri-klops/releases) and run the installer.
+
+Tri-Klops will be installed to `%LOCALAPPDATA%\Programs\Tri-Klops`. A shortcut will be (optionally) created on the desktop which launches PowerShell with `triklops.exe` in the `PATH`.
+
+### MacOS / Linux
+
+No installers yet. Sorry.
+
 ## Usage
 
 ```
 Tri-Klops
 
-Usage: triklops.exe [OPTIONS] <REFERENCE_IMAGE_PATH>
+Usage: triklops [OPTIONS] <REFERENCE_IMAGE_PATH>
 
 Arguments:
   <REFERENCE_IMAGE_PATH>  Path to the reference image
@@ -21,14 +33,12 @@ Options:
           Output path (optional)
   -t, --num-triangles <NUM_TRIANGLES>
           Number of triangles [default: 512]
-  -a, --algorithm <ALGORITHM>
-          Fitness evaluation algorithm [default: mse] [possible values: ssim, mse]
   -i, --image-size <IMAGE_SIZE>
           Image size (width and height) [default: 256]
   -g, --num-generations <NUM_GENERATIONS>
-          Number of generations [default: 512]
+          Number of generations [default: 4096]
   -p, --population-size <POPULATION_SIZE>
-          Population size [default: 256]
+          Population size [default: 512]
   -s, --num-selected <NUM_SELECTED>
           Number of individuals selected per generation [default: 128]
   -m, --mutation-rate <MUTATION_RATE>
@@ -39,6 +49,8 @@ Options:
           Save frequency [default: 1]
   -r, --seed <SEED>
           Seed for the random number generator (optional)
+  -T, --threads <THREADS>
+          Number of threads to use (optional)
   -h, --help
           Print help
 ```
@@ -61,8 +73,9 @@ cargo run --release -- path/to/reference_image.jpg \
   --population-size 512 \
   --num-selected 256 \
   --mutation-rate 0.05 \
-  --algorithm ssim \
   --degeneracy-threshold 10.0 \
+  --seed 42 \
+  --threads 4 \
   --save-frequency 20
 ```
 
@@ -78,40 +91,10 @@ cargo run --release -- path/to/reference_image.jpg \
   <tbody>
     <tr>
       <td>
-          <img src="examples/tri-klops.jpg" alt="Reference Image">
-      </td>
-      <td>
-          <img src="examples/mse_alg--0_rng--256_res--256_tri--256_gen--256_pop--128_sel--0.10_mut.svg" alt="Output Image" width="256">
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-```
-cargo run --release -- examples/tri-klops.jpg \
-    --image-size 256 \
-    --num-triangles 256 \
-    --num-generations 256 \
-    --population-size 256 \
-    --num-selected 128 \
-    --mutation-rate 0.10 \
-    --algorithm mse
-```
-
-<table>
-  <thead>
-    <tr>
-      <th>Reference Image</th>
-      <th>Output Image</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>
           <img src="examples/zardoz.jpg" alt="Reference Image">
       </td>
       <td>
-          <img src="examples/zardoz--alg_ssim--rng_1734233597--res_512--tri_512--gen_512--pop_128--sel_64--mut_0.10--deg_0.00.svg" alt="Output Image" width="256">
+          <img src="examples/zardoz.svg" alt="Output Image" width="256">
       </td>
     </tr>
   </tbody>
@@ -120,12 +103,12 @@ cargo run --release -- examples/tri-klops.jpg \
 ```
 cargo run --release -- examples/zardoz.jpg \
     --image-size 512 \
-    --num-triangles 512 \
-    --num-generations 512 \
+    --num-triangles 1024 \
+    --num-generations 256 \
     --population-size 128 \
     --num-selected 64 \
-    --mutation-rate 0.10 \
-    --algorithm ssim
+    --mutation-rate 0.15 \
+    --degeneracy-threshold 10.0
 ```
 
 <table>
@@ -141,7 +124,7 @@ cargo run --release -- examples/zardoz.jpg \
           <img src="examples/castle.jpg" alt="Reference Image">
       </td>
       <td>
-          <img src="examples/castle--alg_mse--rng_0--res_256--tri_512--gen_512--pop_512--sel_256--mut_0.10--deg_0.00.svg" alt="Output Image" width="256">
+          <img src="examples/castle.svg" alt="Output Image" width="256">
       </td>
     </tr>
   </tbody>
@@ -154,8 +137,7 @@ cargo run --release -- examples/castle.jpg \
     --num-generations 512 \
     --population-size 512 \
     --num-selected 256 \
-    --mutation-rate 0.10 \
-    --algorithm mse
+    --mutation-rate 0.1
 ```
 
 <table>
@@ -171,7 +153,7 @@ cargo run --release -- examples/castle.jpg \
           <img src="examples/kanagawa.jpg" alt="Reference Image">
       </td>
       <td>
-          <img src="examples/kanagawa--alg_ssim--rng_1734196673--res_128--tri_512--gen_512--pop_128--sel_64--mut_0.10--deg_0.00.svg" alt="Output Image" width="256">
+          <img src="examples/kanagawa.svg" alt="Output Image" width="256">
       </td>
     </tr>
   </tbody>
@@ -179,11 +161,10 @@ cargo run --release -- examples/castle.jpg \
 
 ```
 cargo run --release -- examples/kanagawa.jpg \
-    --image-size 128 \
+    --image-size 256 \
     --num-triangles 512 \
-    --num-generations 512 \
+    --num-generations 256 \
     --population-size 128 \
     --num-selected 64 \
-    --mutation-rate 0.10 \
-    --algorithm ssim
+    --mutation-rate 0.1
 ```

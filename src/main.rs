@@ -33,15 +33,15 @@ struct Args {
     image_size: u32,
 
     /// Number of generations
-    #[arg(short = 'g', long = "num-generations", default_value_t = 4096)]
+    #[arg(short = 'g', long = "num-generations", default_value_t = 256)]
     num_generations: usize,
 
     /// Population size
-    #[arg(short = 'p', long = "population-size", default_value_t = 512)]
+    #[arg(short = 'p', long = "population-size", default_value_t = 128)]
     population_size: usize,
 
     /// Number of individuals selected per generation
-    #[arg(short = 's', long = "num-selected", default_value_t = 128)]
+    #[arg(short = 's', long = "num-selected", default_value_t = 64)]
     num_selected: usize,
 
     /// Mutation rate
@@ -150,7 +150,6 @@ fn mutate(
         let x_range = (image_size.0 as f64 * 0.1) as i32;
         let y_range = (image_size.1 as f64 * 0.1) as i32;
 
-        // Jitter vertices
         for i in 0..3 {
             if rng.gen::<f64>() < 0.5 {
                 let x = new_triangle.vertices[i][0] + rng.gen_range(-x_range..=x_range);
@@ -159,7 +158,6 @@ fn mutate(
                 new_triangle.vertices[i][1] = y;
             }
         }
-        // Jitter color
         for i in 0..3 {
             if rng.gen::<f64>() < 0.5 {
                 let color_component = new_triangle.color[i] as i32 + rng.gen_range(-10..=10);
@@ -240,7 +238,7 @@ fn compute_mse(image1: &RgbImage, image2: &RgbImage) -> f64 {
     );
 
     let (width, height) = image1.dimensions();
-    let total_values = (width * height * 3) as f64; // Count R, G, B only
+    let total_values = (width * height * 3) as f64;
 
     let sum_squared_diff: f64 = image1
         .pixels()
@@ -350,7 +348,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .to_rgb8();
 
-    // Use an RGB canvas
     let mut canvas_image = RgbImage::new(image_size.0, image_size.1);
 
     let mut document = Document::new()
@@ -382,7 +379,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let metadata_comment = cmd_args.join(" ");
     document = document.add(svg::node::Comment::new(metadata_comment));
 
-    // Background rectangle
     document = document.add(
         Rectangle::new()
             .set("x", 0)
@@ -392,14 +388,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .set("fill", "black"),
     );
 
-    // Outer progress bar for triangles
     let triangle_progress = ProgressBar::new(num_triangles as u64).with_style(
         ProgressStyle::default_bar()
             .template("Triangles: {bar:40.cyan/blue} {pos}/{len} {eta_precise}"),
     );
 
     for triangle_index in 0..num_triangles {
-        // Inner progress bar for generations
         let generation_progress = ProgressBar::new(num_generations as u64).with_style(
             ProgressStyle::default_bar()
                 .template(" Generations: {bar:40.green/blue} {pos}/{len} {eta_precise}"),
@@ -441,7 +435,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             generation_progress.inc(1);
         }
 
-        // Clear inner progress bar after finishing each triangle's generations
         generation_progress.finish_and_clear();
 
         if let Some(triangle) = best_triangle {
