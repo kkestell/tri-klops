@@ -36,11 +36,11 @@ Options:
   -i, --image-size <IMAGE_SIZE>
           Image size (width and height) [default: 256]
   -g, --num-generations <NUM_GENERATIONS>
-          Number of generations [default: 4096]
+          Number of generations [default: 256]
   -p, --population-size <POPULATION_SIZE>
-          Population size [default: 512]
+          Population size [default: 128]
   -s, --num-selected <NUM_SELECTED>
-          Number of individuals selected per generation [default: 128]
+          Number of individuals selected per generation [default: 64]
   -m, --mutation-rate <MUTATION_RATE>
           Mutation rate [default: 0.1]
   -d, --degeneracy-threshold <DEGENERACY_THRESHOLD>
