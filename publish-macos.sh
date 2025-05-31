@@ -4,7 +4,7 @@ set -e
 
 BINARY_NAME="triklops"
 APP_NAME="Tri-Klops"
-BUNDLE_ID="com.yourname.triklops"
+BUNDLE_ID="org.kestell.triklops"
 VERSION="0.3.0"
 
 rustup target add aarch64-apple-darwin
