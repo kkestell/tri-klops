@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod algo;
 mod gui;
 
