@@ -48,7 +48,7 @@ impl TriKlopsApp {
     fn render_generation_preview(&self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let progress = self.progress.lock().unwrap();
 
-        if progress.is_running && !progress.current_generation.is_empty() {
+        if !progress.current_generation.is_empty() {
             // Create a full-sized image with all triangles from current generation
             let mut generation_image = RgbImage::new(self.params.image_size, self.params.image_size);
 
