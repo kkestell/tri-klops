@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 BINARY_NAME="triklops"
 APP_NAME="Tri-Klops"
 BUNDLE_ID="org.kestell.triklops"
-VERSION="0.3.0"
+VERSION="0.4.0"
 
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
