@@ -1,5 +1,3 @@
-#define SourceDir "C:\Users\Kyle\Source\tri-klops"
-
 [Setup]
 AppId={{c447ed56-3520-4c8e-a3a7-9c82d001a824}}
 AppName=Tri-Klops
@@ -13,9 +11,9 @@ DefaultDirName={autopf}\Tri-Klops
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-LicenseFile={#SourceDir}\LICENSE
+LicenseFile=LICENSE
 PrivilegesRequired=lowest
-OutputDir={#SourceDir}\publish
+OutputDir=publish
 OutputBaseFilename=Tri-Klops_0.3.0_Setup
 Compression=lzma
 SolidCompression=yes
@@ -30,7 +28,7 @@ Name: "desktopicon"; Description: "Create a Desktop shortcut"; GroupDescription:
 Name: "startmenuicon"; Description: "Create a Start Menu shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-Source: "{#SourceDir}\target\release\triklops.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "target\release\triklops.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Tri-Klops"; Filename: "{app}\triklops.exe"; Tasks: startmenuicon

@@ -1,10 +1,12 @@
 $ErrorActionPreference = 'Stop'
 
-cargo build --release
+Push-Location $PSScriptRoot
+try {
+    cargo build --release --locked
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "cargo build failed with exit code $LASTEXITCODE"
+    & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" install.iss
     exit $LASTEXITCODE
+} finally {
+    Pop-Location
 }
-
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" install.iss

@@ -1,5 +1,4 @@
 #![windows_subsystem = "windows"]
-mod algo;
 mod gui;
 
 use crate::gui::TriKlopsApp;
@@ -17,9 +16,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         app_name,
         options,
-        Box::new(|cc| {
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::<TriKlopsApp>::default())
-        }),
+        Box::new(|_| Ok(Box::<TriKlopsApp>::default())),
     )
 }

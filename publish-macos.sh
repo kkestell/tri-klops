@@ -1,30 +1,25 @@
 #!/bin/bash
 
 set -e
+cd "$(dirname "$0")"
 
 BINARY_NAME="triklops"
 APP_NAME="Tri-Klops"
 BUNDLE_ID="org.kestell.triklops"
 VERSION="0.3.0"
 
-rustup target add aarch64-apple-darwin
+rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
-cargo build --release --target x86_64-apple-darwin
+cargo build --locked --release --target x86_64-apple-darwin
 
-cargo build --release --target aarch64-apple-darwin
+cargo build --locked --release --target aarch64-apple-darwin
 
+rm -rf "${APP_NAME}.app"
+mkdir -p "${APP_NAME}.app/Contents/MacOS"
 lipo -create \
-    target/x86_64-apple-darwin/release/$BINARY_NAME \
-    target/aarch64-apple-darwin/release/$BINARY_NAME \
-    -output target/release/${BINARY_NAME}_universal
-
-rm -rf ${APP_NAME}.app
-
-mkdir -p ${APP_NAME}.app/Contents/MacOS
-mkdir -p ${APP_NAME}.app/Contents/Resources
-
-cp target/release/${BINARY_NAME}_universal ${APP_NAME}.app/Contents/MacOS/$BINARY_NAME
-chmod +x ${APP_NAME}.app/Contents/MacOS/$BINARY_NAME
+    "target/x86_64-apple-darwin/release/$BINARY_NAME" \
+    "target/aarch64-apple-darwin/release/$BINARY_NAME" \
+    -output "${APP_NAME}.app/Contents/MacOS/$BINARY_NAME"
 
 cat > ${APP_NAME}.app/Contents/Info.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -50,8 +45,6 @@ cat > ${APP_NAME}.app/Contents/Info.plist << EOF
 </dict>
 </plist>
 EOF
-
-rm target/release/${BINARY_NAME}_universal
 
 ZIP_NAME="${APP_NAME}_${VERSION}_macOS.zip"
 zip -r "$ZIP_NAME" "${APP_NAME}.app"
