@@ -148,14 +148,13 @@ pub fn run_algorithm(
         );
         if let Some(best) = best {
             let triangle = best.triangle;
-            triangle.paint(&mut canvas);
+            rows.accept(best, &mut canvas);
             let points = triangle.vertices.map(|[x, y]| format!("{x},{y}")).join(" ");
             document.append(
                 Polygon::new()
                     .set("points", points)
                     .set("fill", fill(triangle.color)),
             );
-            rows = ScoreRows::new(reference, &canvas);
             progress
                 .lock()
                 .unwrap()

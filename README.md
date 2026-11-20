@@ -45,12 +45,14 @@ The first command runs all four bundled 256×256 images with seeds 7, 42, and 10
 
 Both commands report wall time from the start of approximation through the SVG write, plus the final canvas's mean squared RGB error against the reference. Lower error means a closer pixel match. Image decoding, compilation, and GUI rendering are outside the timer. The generated SVGs are in `target/approximation-bench/`.
 
-On an Apple M4 with Rust 1.100.0, the following release-build measurements compare the original generator at `1021a8b` with the updated generator. For the quality check, librsvg 2.63.2 independently rasterized each saved SVG at 256×256. The table reports mean squared error against the decoded source JPEG.
+On an Apple M4 with Rust 1.100.0, the following release-build measurements compare the original generator at `1021a8b` with the generator at `20bef7f`. For the quality check, librsvg 2.63.2 independently rasterized each saved SVG at 256×256. The table reports mean squared error against the decoded source JPEG.
 
 | Workload | Original time | Updated time | Speedup | Original SVG error | Updated SVG error |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Four images × three seeds, mean per run | 249 ms | 20.8 ms | 12.0× | 2,000.7 | 883.7 |
 | Castle, defaults, seed 42 | 195.0 s | 3.84 s | 50.8× | 351.1 | 136.7 |
+
+A further optimization on the same M4 reduced the short benchmark from 18.8 ms to 2.68 ms per image (7.0×) and Castle at defaults from 3.82 s to 0.797 s (4.8×). These are medians of five runs per version, alternating between `20bef7f` and the current build. All 13 generated SVGs matched byte for byte.
 
 ## Package a release
 

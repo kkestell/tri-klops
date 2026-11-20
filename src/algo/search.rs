@@ -1,5 +1,5 @@
-use super::AlgorithmParams;
 use super::raster::{Candidate, ScoreRows, Vertices};
+use super::{AlgorithmParams, Triangle};
 use image::RgbImage;
 use rand::{RngExt, rngs::SmallRng};
 use rayon::prelude::*;
@@ -40,6 +40,31 @@ fn meets_angle_limit(vertices: Vertices, max_cosine: f64) -> bool {
     })
 }
 
+#[derive(Clone, Copy)]
+enum Proposal {
+    New(Vertices),
+    Inherited(Candidate),
+}
+
+impl Proposal {
+    fn evaluate(self, rows: &ScoreRows, cosine: Option<f64>) -> Candidate {
+        let vertices = match self {
+            Self::Inherited(parent) => return parent,
+            Self::New(vertices) => vertices,
+        };
+        if cosine.is_some_and(|limit| !meets_angle_limit(vertices, limit)) {
+            return Candidate {
+                triangle: Triangle {
+                    vertices,
+                    color: [0; 3],
+                },
+                gain: i64::MIN,
+            };
+        }
+        rows.fit(vertices)
+    }
+}
+
 pub(super) fn best_triangle(
     params: &AlgorithmParams,
     reference: &RgbImage,
@@ -49,7 +74,7 @@ pub(super) fn best_triangle(
     mut progress: impl FnMut(usize, Option<Candidate>) -> bool,
 ) -> Option<Candidate> {
     let mut shapes: Vec<_> = (0..params.population_size)
-        .map(|_| initial_shape(reference, canvas, rng))
+        .map(|_| Proposal::New(initial_shape(reference, canvas, rng)))
         .collect();
     let cosine = params
         .degeneracy_threshold
@@ -59,21 +84,11 @@ pub(super) fn best_triangle(
     let mut best = None;
     let mut ranked = Vec::with_capacity(shapes.len());
     for generation in 0..params.num_generations {
+        // Small populations cost more to split across workers than to score locally.
         shapes
             .par_iter()
-            .map(|&vertices| {
-                if cosine.is_some_and(|limit| !meets_angle_limit(vertices, limit)) {
-                    Candidate {
-                        triangle: super::Triangle {
-                            vertices,
-                            color: [0; 3],
-                        },
-                        gain: i64::MIN,
-                    }
-                } else {
-                    rows.fit(vertices)
-                }
-            })
+            .with_min_len(128)
+            .map(|shape| shape.evaluate(rows, cosine))
             .collect_into_vec(&mut ranked);
         ranked.sort_unstable_by_key(|c| std::cmp::Reverse(c.gain));
         let leader = ranked[0];
@@ -91,24 +106,31 @@ pub(super) fn best_triangle(
     best
 }
 
-fn breed(parents: &[Candidate], size: i32, mutation_rate: f64, rng: &mut SmallRng) -> Vertices {
-    let mut parent = || {
-        parents[rng.random_range(0..parents.len())]
-            .triangle
-            .vertices
-    };
+fn breed(parents: &[Candidate], size: i32, mutation_rate: f64, rng: &mut SmallRng) -> Proposal {
+    let mut parent = || parents[rng.random_range(0..parents.len())];
     let a = parent();
     let b = parent();
     let step = (size / 10).max(1);
-    std::array::from_fn(|i| {
-        let mut vertex = if rng.random_bool(0.5) { a[i] } else { b[i] };
+    let vertices = std::array::from_fn(|i| {
+        let mut vertex = if rng.random_bool(0.5) {
+            a.triangle.vertices[i]
+        } else {
+            b.triangle.vertices[i]
+        };
         if rng.random_bool(mutation_rate) {
             for coord in &mut vertex {
                 *coord = (*coord + rng.random_range(-step..=step)).clamp(-size, 2 * size);
             }
         }
         vertex
-    })
+    });
+    if vertices == a.triangle.vertices {
+        Proposal::Inherited(a)
+    } else if vertices == b.triangle.vertices {
+        Proposal::Inherited(b)
+    } else {
+        Proposal::New(vertices)
+    }
 }
 
 #[cfg(test)]

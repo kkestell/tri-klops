@@ -29,27 +29,34 @@ fn spans(
     let mut points = vertices;
     points.sort_unstable_by_key(|p| p[1]);
     let [top, mid, bottom] = points;
-    let dx = |p: [i32; 2]| i64::from(p[0] - top[0]);
-    let dy = |p: [i32; 2]| i64::from(p[1] - top[1]);
-    if dx(mid) * dy(bottom) == dx(bottom) * dy(mid) {
+    let dx = |p: [i32; 2]| i128::from(p[0]) - i128::from(top[0]);
+    let dy = |p: [i32; 2]| i128::from(p[1]) - i128::from(top[1]);
+    let area = dx(mid) * dy(bottom) - dx(bottom) * dy(mid);
+    if area == 0 {
         return;
     }
-    let slope = |a: [i32; 2], b: [i32; 2]| (b[0] - a[0]) as f64 / (b[1] - a[1]) as f64;
-    let long_slope = slope(top, bottom);
-    let boundary = |x: f64| (x - 0.5).ceil().clamp(0.0, width as f64) as usize;
+
+    let edge = |a: [i32; 2], b: [i32; 2]| {
+        let slope = (f64::from(b[0]) - f64::from(a[0])) / (f64::from(b[1]) - f64::from(a[1]));
+        move |y: i32| {
+            let x = f64::from(a[0]) + (f64::from(y) - f64::from(a[1]) + 0.5) * slope;
+            ((x - 0.5).ceil() as u32).min(width) as usize
+        }
+    };
+    let long = edge(top, bottom);
     for (a, b) in [(top, mid), (mid, bottom)] {
         let rows = a[1].max(0)..b[1].min(height as i32);
         if rows.is_empty() {
             continue;
         }
-        let short_slope = slope(a, b);
+        let short = edge(a, b);
+        let (left, right) = if area > 0 {
+            (&long, &short)
+        } else {
+            (&short, &long)
+        };
         for y in rows {
-            let left = top[0] as f64 + (f64::from(y - top[1]) + 0.5) * long_slope;
-            let right = a[0] as f64 + (f64::from(y - a[1]) + 0.5) * short_slope;
-            let xs = boundary(left.min(right))..boundary(left.max(right));
-            if !xs.is_empty() {
-                visit(y as usize, xs);
-            }
+            visit(y as usize, left(y)..right(y));
         }
     }
 }
@@ -92,6 +99,31 @@ impl ScoreRows {
             prefix,
             error,
         }
+    }
+
+    // For a fill C over target T, the fourth prefix component accumulates
+    // |T - C|² - |T|² = |C|² - 2 C·T. Only this component changes.
+    pub fn accept(&mut self, candidate: Candidate, canvas: &mut RgbImage) {
+        candidate.triangle.paint(canvas);
+        let color = candidate.triangle.color.map(i64::from);
+        let norm = color.iter().map(|v| v * v).sum::<i64>();
+        spans(candidate.triangle.vertices, self.dimensions, |y, xs| {
+            if xs.is_empty() {
+                return;
+            }
+            let row = &mut self.prefix[y * self.stride..(y + 1) * self.stride];
+            let start = row[xs.start];
+            let old_end = row[xs.end][3];
+            for (i, p) in row[xs.start + 1..=xs.end].iter_mut().enumerate() {
+                let dot = (0..3).map(|c| color[c] * (p[c] - start[c])).sum::<i64>();
+                p[3] = start[3] + (i as i64 + 1) * norm - 2 * dot;
+            }
+            let delta = row[xs.end][3] - old_end;
+            for p in &mut row[xs.end + 1..] {
+                p[3] += delta;
+            }
+        });
+        self.error -= candidate.gain;
     }
 
     pub fn fitness(&self, error: i64) -> f64 {
@@ -148,6 +180,23 @@ mod tests {
                 [true, false, false, false],
             ]
         );
+    }
+
+    #[test]
+    fn incremental_scores_match_a_full_rebuild_after_overlapping_fills() {
+        let reference = RgbImage::from_fn(12, 9, |x, y| Rgb([(x * 23) as u8, (y * 31) as u8, 120]));
+        let mut canvas = RgbImage::from_pixel(12, 9, Rgb([60, 80, 140]));
+        let mut rows = ScoreRows::new(&reference, &canvas);
+        for vertices in [
+            [[-4, 2], [7, -3], [15, 9]],
+            [[11, 8], [0, 8], [5, 1]],
+            [[12, 0], [5, 9], [-4, 0]],
+        ] {
+            rows.accept(rows.fit(vertices), &mut canvas);
+            let rebuilt = ScoreRows::new(&reference, &canvas);
+            assert_eq!(rows.error, rebuilt.error);
+            assert_eq!(rows.prefix, rebuilt.prefix);
+        }
     }
 
     #[test]
