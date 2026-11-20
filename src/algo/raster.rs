@@ -21,7 +21,7 @@ impl Triangle {
 
 // SVG coordinates lie on pixel boundaries. Sample the center of each pixel,
 // including the left edge and excluding the right edge and horizontal edges.
-fn spans(
+pub(super) fn spans(
     vertices: Vertices,
     (width, height): (u32, u32),
     mut visit: impl FnMut(usize, Range<usize>),
@@ -61,6 +61,10 @@ fn spans(
     }
 }
 
+pub(super) fn fitness(error: i64, (width, height): (u32, u32)) -> f64 {
+    -(error as f64) / (f64::from(width) * f64::from(height) * 3.0)
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct Candidate {
     pub triangle: Triangle,
@@ -69,7 +73,7 @@ pub(super) struct Candidate {
 
 pub(super) struct ScoreRows {
     stride: usize,
-    dimensions: (u32, u32),
+    pub(super) dimensions: (u32, u32),
     prefix: Vec<[i64; 4]>,
     pub error: i64,
 }
@@ -124,11 +128,6 @@ impl ScoreRows {
             }
         });
         self.error -= candidate.gain;
-    }
-
-    pub fn fitness(&self, error: i64) -> f64 {
-        let (width, height) = self.dimensions;
-        -(error as f64) / (f64::from(width) * f64::from(height) * 3.0)
     }
 
     pub fn fit(&self, vertices: Vertices) -> Candidate {

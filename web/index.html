@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Create images from triangles using a genetic algorithm.">
+    <title>Tri-Klops</title>
+    <link rel="icon" href="./icon.png" type="image/png">
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { background: #1b1b1b; color: #eee; font: 1rem system-ui, sans-serif; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #status { position: absolute; inset: 0; margin: auto; width: fit-content; height: fit-content; padding: 1rem; }
+    </style>
+  </head>
+  <body>
+    <canvas id="app" aria-label="Tri-Klops"></canvas>
+    <p id="status" role="status">Loading Tri-Klops…</p>
+    <noscript>Tri-Klops requires JavaScript and WebAssembly.</noscript>
+    <script type="module">
+      import init, { start_app } from "./triklops.js";
+
+      const status = document.querySelector("#status");
+      try {
+        await init();
+        await start_app(document.querySelector("#app"));
+        status.remove();
+      } catch (error) {
+        status.textContent = "Tri-Klops could not start. " + error;
+        console.error(error);
+      }
+    </script>
+  </body>
+</html>

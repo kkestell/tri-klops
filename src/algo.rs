@@ -1,23 +1,33 @@
+mod geometry;
+mod population;
 mod raster;
 mod search;
 
 use image::{Rgb, RgbImage};
 use rand::{SeedableRng, rngs::SmallRng};
-use std::{
-    io,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
+#[cfg(not(target_arch = "wasm32"))]
+use std::{io, path::Path};
 use svg::{
     Document, Node,
     node::element::{Polygon, Rectangle},
 };
 
 pub use raster::Triangle;
-use raster::{Candidate, ScoreRows};
+use raster::{Candidate, ScoreRows, fitness};
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
+pub enum SearchMode {
+    #[default]
+    Greedy,
+    WholeDrawing,
+}
 
 #[derive(Clone)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct AlgorithmParams {
+    pub mode: SearchMode,
     pub num_triangles: usize,
     pub image_size: u32,
     pub num_generations: usize,
@@ -33,9 +43,10 @@ pub struct AlgorithmParams {
 impl Default for AlgorithmParams {
     fn default() -> Self {
         Self {
-            num_triangles: 512,
+            mode: SearchMode::Greedy,
+            num_triangles: 1024,
             image_size: 256,
-            num_generations: 256,
+            num_generations: 512,
             population_size: 128,
             num_selected: 64,
             mutation_rate: 0.1,
@@ -49,6 +60,7 @@ impl Default for AlgorithmParams {
 #[derive(Clone, Default)]
 pub struct Progress {
     pub triangle_index: usize,
+    pub triangle_count: usize,
     pub generation_index: usize,
     pub current_fitness: f64,
     pub should_stop: bool,
@@ -64,22 +76,22 @@ impl Progress {
         generation: usize,
         best: Option<Candidate>,
         rows: &ScoreRows,
-    ) -> bool {
+    ) {
         self.triangle_index = triangle_index;
         self.generation_index = generation;
         let triangle = best.map(|candidate| candidate.triangle);
         if self.candidate != triangle {
             self.candidate = triangle;
             let error = rows.error - best.map_or(0, |candidate| candidate.gain);
-            self.current_fitness = rows.fitness(error);
+            self.current_fitness = fitness(error, rows.dimensions);
             self.revision += 1;
         }
-        !self.should_stop
     }
 
-    fn publish_canvas(&mut self, canvas: &RgbImage, fitness: f64) {
+    fn publish_canvas(&mut self, canvas: &RgbImage, error: i64, triangle_count: usize) {
+        self.triangle_count = triangle_count;
         self.canvas = Some(Arc::new(canvas.clone()));
-        self.current_fitness = fitness;
+        self.current_fitness = fitness(error, canvas.dimensions());
         self.candidate = None;
         self.revision += 1;
     }
@@ -100,12 +112,23 @@ fn fill([r, g, b]: [u8; 3]) -> String {
     format!("rgb({r},{g},{b})")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_algorithm(
     params: &AlgorithmParams,
     reference: &RgbImage,
     output: &Path,
     progress: &Mutex<Progress>,
 ) -> io::Result<()> {
+    let drawing = pollster::block_on(approximate(params, reference, progress, async |_| {}));
+    svg::save(output, &drawing)
+}
+
+pub async fn approximate(
+    params: &AlgorithmParams,
+    reference: &RgbImage,
+    progress: &Mutex<Progress>,
+    mut checkpoint: impl AsyncFnMut(&Mutex<Progress>),
+) -> Document {
     let size = params.image_size;
     assert!(size > 0 && reference.dimensions() == (size, size));
     assert!(params.population_size > 0 && params.num_selected > 0);
@@ -114,7 +137,84 @@ pub fn run_algorithm(
         .seed
         .map_or_else(rand::make_rng, SmallRng::seed_from_u64);
     let background = mean_color(reference);
-    let mut canvas = RgbImage::from_pixel(size, size, Rgb(background));
+    let canvas = RgbImage::from_pixel(size, size, Rgb(background));
+    let triangles = match params.mode {
+        SearchMode::Greedy => {
+            greedy(
+                params,
+                reference,
+                canvas,
+                progress,
+                &mut rng,
+                &mut checkpoint,
+            )
+            .await
+        }
+        SearchMode::WholeDrawing => {
+            population::evolve(
+                params,
+                reference,
+                canvas,
+                progress,
+                &mut rng,
+                &mut checkpoint,
+            )
+            .await
+        }
+    };
+    svg_document(size, background, &triangles)
+}
+
+async fn greedy(
+    params: &AlgorithmParams,
+    reference: &RgbImage,
+    mut canvas: RgbImage,
+    progress: &Mutex<Progress>,
+    rng: &mut SmallRng,
+    checkpoint: &mut impl AsyncFnMut(&Mutex<Progress>),
+) -> Vec<Triangle> {
+    let mut triangles = Vec::new();
+    let mut rows = ScoreRows::new(reference, &canvas);
+    progress
+        .lock()
+        .unwrap()
+        .publish_canvas(&canvas, rows.error, 0);
+    checkpoint(progress).await;
+    for triangle_index in 0..params.num_triangles {
+        if rows.error == 0 || progress.lock().unwrap().should_stop {
+            break;
+        }
+        let best = search::best_triangle(
+            params,
+            reference,
+            &canvas,
+            &rows,
+            rng,
+            async |generation, best| {
+                progress
+                    .lock()
+                    .unwrap()
+                    .report_candidate(triangle_index, generation, best, &rows);
+                checkpoint(progress).await;
+                !progress.lock().unwrap().should_stop
+            },
+        )
+        .await;
+        if let Some(best) = best {
+            let triangle = best.triangle;
+            rows.accept(best, &mut canvas);
+            triangles.push(triangle);
+            progress
+                .lock()
+                .unwrap()
+                .publish_canvas(&canvas, rows.error, triangles.len());
+            checkpoint(progress).await;
+        }
+    }
+    triangles
+}
+
+fn svg_document(size: u32, background: [u8; 3], triangles: &[Triangle]) -> Document {
     let mut document = Document::new()
         .set("width", size)
         .set("height", size)
@@ -127,42 +227,13 @@ pub fn run_algorithm(
                 .set("fill", fill(background)),
         );
 
-    let mut rows = ScoreRows::new(reference, &canvas);
-    progress
-        .lock()
-        .unwrap()
-        .publish_canvas(&canvas, rows.fitness(rows.error));
-    for triangle_index in 0..params.num_triangles {
-        if rows.error == 0 || progress.lock().unwrap().should_stop {
-            break;
-        }
-        let best = search::best_triangle(
-            params,
-            reference,
-            &canvas,
-            &rows,
-            &mut rng,
-            |generation, best| {
-                progress
-                    .lock()
-                    .unwrap()
-                    .report_candidate(triangle_index, generation, best, &rows)
-            },
+    for triangle in triangles {
+        let points = triangle.vertices.map(|[x, y]| format!("{x},{y}")).join(" ");
+        document.append(
+            Polygon::new()
+                .set("points", points)
+                .set("fill", fill(triangle.color)),
         );
-        if let Some(best) = best {
-            let triangle = best.triangle;
-            rows.accept(best, &mut canvas);
-            let points = triangle.vertices.map(|[x, y]| format!("{x},{y}")).join(" ");
-            document.append(
-                Polygon::new()
-                    .set("points", points)
-                    .set("fill", fill(triangle.color)),
-            );
-            progress
-                .lock()
-                .unwrap()
-                .publish_canvas(&canvas, rows.fitness(rows.error));
-        }
     }
-    svg::save(output, &document)
+    document
 }

@@ -17,11 +17,36 @@ rustup update stable
 cargo run --release --locked
 ```
 
-Load a reference image and choose **Start Processing**. The preview shows the best candidate over the accepted triangles. When the run finishes, or when you stop it, Tri-Klops saves an SVG next to the reference image using the same filename stem. An existing SVG at that path is replaced.
+Load a reference image and choose **Start processing**. When the run finishes, or when you stop it, Tri-Klops saves an SVG next to the reference image using the same filename stem. An existing SVG at that path is replaced.
+
+### Browser build
+
+Open [Tri-Klops in your browser](https://tri-klops.pages.dev). The app processes images locally in a Web Worker. Choose **Download SVG** after the run finishes or after you stop it.
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.130 --locked
+./web/build.sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory target/web
+```
+
+Open [localhost:8000](http://localhost:8000). The `wasm-bindgen-cli` version must match `wasm-bindgen` in `Cargo.lock`.
+
+To publish a build to the `tri-klops` Cloudflare Pages project, use [Wrangler Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/).
+
+```sh
+npx wrangler pages deploy target/web --project-name tri-klops --branch main
+```
+
+### Search modes
+
+**One at a time** (default) searches for the next triangle to add. Each accepted triangle stays in place.
+
+**Whole drawing** evolves a population of complete drawings. Set **Triangle limit** to the maximum number of triangles in each drawing. As a drawing grows, the search spends more trials moving a single vertex of the best drawing. Other trials add, replace, or recombine triangles. Each trial refits the colors of visible triangles and frees any slots taken by fully hidden triangles. **Generations** sets the search budget for the entire drawing. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
 
 ### Shaping the triangles
 
-Raise **Chunkiness** to rule out skinny triangles. Increase **Grid snap** to make corners land on shared grid points. At 0% chunkiness and 1 px spacing, the generator has full freedom. Choose **Start Processing** to use the new settings. [See these controls on The Great Wave](#the-great-wave-off-kanagawa).
+Raise **Chunkiness** to rule out skinny triangles. Increase **Grid snap** to make corners land on shared grid points. At 0% chunkiness and 1 px spacing, the generator has full freedom. Choose **Start processing** to use the new settings. [See these controls on The Great Wave](#the-great-wave-off-kanagawa).
 
 ## Package a release
 
