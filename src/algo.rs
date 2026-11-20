@@ -25,6 +25,8 @@ pub struct AlgorithmParams {
     pub num_selected: usize,
     pub mutation_rate: f64,
     pub degeneracy_threshold: Option<f64>,
+    /// Distance between allowed vertex coordinates, in canvas pixels (1 is free placement).
+    pub grid_spacing: u16,
     pub seed: Option<u64>,
 }
 
@@ -38,6 +40,7 @@ impl Default for AlgorithmParams {
             num_selected: 64,
             mutation_rate: 0.1,
             degeneracy_threshold: None,
+            grid_spacing: 1,
             seed: None,
         }
     }

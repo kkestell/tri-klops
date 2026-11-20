@@ -47,9 +47,13 @@ enum Proposal {
 }
 
 impl Proposal {
-    fn evaluate(self, rows: &ScoreRows, cosine: Option<f64>) -> Candidate {
+    fn evaluate(self, rows: &ScoreRows, cosine: Option<f64>, grid_spacing: u16) -> Candidate {
         let vertices = match self {
             Self::Inherited(parent) => return parent,
+            Self::New(vertices) if grid_spacing > 1 => {
+                let step = i32::from(grid_spacing);
+                vertices.map(|point| point.map(|v| (v + step / 2).div_euclid(step) * step))
+            }
             Self::New(vertices) => vertices,
         };
         if cosine.is_some_and(|limit| !meets_angle_limit(vertices, limit)) {
@@ -88,7 +92,7 @@ pub(super) fn best_triangle(
         shapes
             .par_iter()
             .with_min_len(128)
-            .map(|shape| shape.evaluate(rows, cosine))
+            .map(|shape| shape.evaluate(rows, cosine, params.grid_spacing))
             .collect_into_vec(&mut ranked);
         ranked.sort_unstable_by_key(|c| std::cmp::Reverse(c.gain));
         let leader = ranked[0];
@@ -100,24 +104,29 @@ pub(super) fn best_triangle(
         }
         let parents = &ranked[..params.num_selected.min(ranked.len())];
         for shape in &mut shapes {
-            *shape = breed(parents, size, params.mutation_rate, rng);
+            *shape = breed(parents, size, params, rng);
         }
     }
     best
 }
 
-fn breed(parents: &[Candidate], size: i32, mutation_rate: f64, rng: &mut SmallRng) -> Proposal {
+fn breed(
+    parents: &[Candidate],
+    size: i32,
+    params: &AlgorithmParams,
+    rng: &mut SmallRng,
+) -> Proposal {
     let mut parent = || parents[rng.random_range(0..parents.len())];
     let a = parent();
     let b = parent();
-    let step = (size / 10).max(1);
+    let step = (size / 10).max(i32::from(params.grid_spacing)).max(1);
     let vertices = std::array::from_fn(|i| {
         let mut vertex = if rng.random_bool(0.5) {
             a.triangle.vertices[i]
         } else {
             b.triangle.vertices[i]
         };
-        if rng.random_bool(mutation_rate) {
+        if rng.random_bool(params.mutation_rate) {
             for coord in &mut vertex {
                 *coord = (*coord + rng.random_range(-step..=step)).clamp(-size, 2 * size);
             }
@@ -136,6 +145,19 @@ fn breed(parents: &[Candidate], size: i32, mutation_rate: f64, rng: &mut SmallRn
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fit_and_angle_check_use_snapped_vertices() {
+        let image = RgbImage::new(16, 16);
+        let rows = ScoreRows::new(&image, &image);
+        let proposal = Proposal::New([[-3, 1], [6, 3], [2, 7]]);
+        let snapped = [[-4, 0], [8, 4], [4, 8]];
+        let fitted = proposal.evaluate(&rows, None, 4);
+        assert_eq!(fitted.triangle, rows.fit(snapped).triangle);
+        assert_eq!(fitted.gain, rows.fit(snapped).gain);
+        let collapses = Proposal::New([[3, 3], [4, 4], [13, 6]]);
+        assert_eq!(collapses.evaluate(&rows, Some(1.0), 4).gain, i64::MIN);
+    }
 
     #[test]
     fn threshold_checks_each_corner_and_rejects_coincident_vertices() {

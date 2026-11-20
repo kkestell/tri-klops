@@ -2,22 +2,7 @@
 
 Create images from triangles using a genetic algorithm.
 
-<p align="center">
-    <img alt="Tri-Klops" src="screenshot.png">
-</p>
-
-## Deckard in 4,096 triangles
-
-![Deckard from Blade Runner, shown as the reference crop, a 512-triangle approximation, and a 4,096-triangle approximation](examples/deckard-comparison.jpg)
-
-At 4,096 triangles, the crease across Deckard’s forehead and the contours around his eyes come into focus. [Open the full-size SVG](examples/deckard.svg) · [Original 1982 film still via Scene Still](https://www.scenestill.com/storage/film-stills/webp/vlcsnap-2026-01-31-12h40m01s195_webp.webp)
-
-| Canvas | Triangles | Time on Apple M4 | Mean squared RGB error |
-| --- | ---: | ---: | ---: |
-| 256×256 | 512 | 3.86 s | 45.71 |
-| 1024×1024 | 4,096 | 47.0 s | 24.47 |
-
-Both runs used the same square crop and seed 42. Rendering both SVGs at 1024×1024 and comparing them to the same reference showed **46.5% lower error** for the larger run.
+![Tri-Klops application screenshot](https://raw.githubusercontent.com/kkestell/tri-klops/main/screenshot.png)
 
 ## Installation
 
@@ -33,6 +18,10 @@ cargo run --release --locked
 ```
 
 Load a reference image and choose **Start Processing**. The preview shows the best candidate over the accepted triangles. When the run finishes, or when you stop it, Tri-Klops saves an SVG next to the reference image using the same filename stem. An existing SVG at that path is replaced.
+
+### Shaping the triangles
+
+Raise **Chunkiness** to rule out skinny triangles. Increase **Grid snap** to make corners land on shared grid points. At 0% chunkiness and 1 px spacing, the generator has full freedom. Choose **Start Processing** to use the new settings. [See these controls on The Great Wave](#the-great-wave-off-kanagawa).
 
 ## Benchmark
 
@@ -61,45 +50,40 @@ A further optimization on the same M4 reduced the short benchmark from 18.8 ms t
 
 ## Examples
 
-<table>
-  <thead>
-    <tr>
-      <th>Reference Image</th>
-      <th>Output Image</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>
-          <img src="examples/tri-klops.jpg" alt="Reference Image">
-      </td>
-      <td>
-          <img src="examples/tri-klops.svg" alt="Output Image">
-      </td>
-    </tr>
-    <tr>
-      <td>
-          <img src="examples/zardoz.jpg" alt="Reference Image">
-      </td>
-      <td>
-          <img src="examples/zardoz.svg" alt="Output Image">
-      </td>
-    </tr>
-    <tr>
-      <td>
-          <img src="examples/castle.jpg" alt="Reference Image">
-      </td>
-      <td>
-          <img src="examples/castle.svg" alt="Output Image">
-      </td>
-    </tr>
-    <tr>
-      <td>
-          <img src="examples/kanagawa.jpg" alt="Reference Image">
-      </td>
-      <td>
-          <img src="examples/kanagawa.svg" alt="Output Image">
-      </td>
-    </tr>
-  </tbody>
-</table>
+All runs use seed 42. Deckard, Zardoz, and The Great Wave use 1024×1024 canvases and a 4,096-triangle budget.
+
+### Deckard
+
+![Triangle rendering of Deckard from Blade Runner](./examples/deckard-render.jpg)
+
+[Reference crop](./examples/deckard-reference.jpg) · [512-triangle render at 256×256](./examples/deckard-512.jpg) · [Full-size SVG](./examples/deckard.svg) · [Film still via Scene Still](https://www.scenestill.com/storage/film-stills/webp/vlcsnap-2026-01-31-12h40m01s195_webp.webp)
+
+### Zardoz
+
+![Triangle rendering of Zardoz](./examples/zardoz-render.jpg)
+
+[Reference image](./examples/zardoz.jpg) · [512-triangle render at 256×256](./examples/zardoz-512.jpg) · [Full-size SVG](./examples/zardoz.svg)
+
+### The Great Wave off Kanagawa
+
+![Triangle rendering of Hokusai’s Great Wave using chunky triangles and a snapped grid](./examples/kanagawa-styled-render.jpg)
+
+This render uses 90% **Chunkiness** and 16 px **Grid snap**.
+
+[Reference image](./examples/kanagawa.jpg) · [Free-placement render](./examples/kanagawa-render.jpg) · [Full-size SVG](./examples/kanagawa-styled.svg) · [Free-placement SVG](./examples/kanagawa.svg)
+
+### J. Robert Oppenheimer
+
+![Triangle rendering of J. Robert Oppenheimer holding a pipe in front of a chalkboard](./examples/oppenheimer-render.jpg)
+
+The 1280×1635 render uses a 12,288-triangle budget and preserves the framing of Philippe Halsman’s 1958 portrait.
+
+[Reference photograph via Magnum Photos](https://content.magnumphotos.com/wp-content/uploads/2019/05/cortex/par196080-teaser-story-big.jpg) · [Full-size SVG](./examples/oppenheimer.svg)
+
+### Blade Runner in neon
+
+![Triangle rendering of Deckard reading a newspaper against neon signs](./examples/blade-runner-neon-render.jpg)
+
+The 1920×800 render uses free vertex placement and 320 search generations per triangle. The 16,384-triangle budget produced 12,955 triangles.
+
+[Film still via Scene Still](https://www.scenestill.com/storage/film-stills/webp/vlcsnap-2026-01-31-12h33m14s004_webp.webp) · [Full-size SVG](./examples/blade-runner-neon.svg)

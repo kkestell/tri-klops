@@ -103,9 +103,38 @@ impl TriKlopsApp {
     }
 
     fn parameters(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("params").show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Triangles");
+            ui.add(egui::DragValue::new(&mut self.params.num_triangles).range(0..=usize::MAX));
+        });
+        // The simple slider covers 0–45°; Advanced also accepts exact angles.
+        let mut chunkiness = (self.params.degeneracy_threshold.unwrap_or(0.0) / 0.45).min(100.0);
+        if ui
+            .add(
+                egui::Slider::new(&mut chunkiness, 0.0..=100.0)
+                    .text("Chunkiness")
+                    .suffix("%")
+                    .integer(),
+            )
+            .on_hover_text("Higher values rule out long, skinny triangles.")
+            .changed()
+        {
+            self.params.degeneracy_threshold = (chunkiness > 0.0).then_some(chunkiness * 0.45);
+        }
+        ui.add(
+            egui::Slider::new(&mut self.params.grid_spacing, 1..=32)
+                .text("Grid snap")
+                .suffix(" px"),
+        )
+        .on_hover_text(
+            "Space triangle corners farther apart on a square grid. 1 px allows every position.",
+        );
+        ui.collapsing("Advanced", |ui| self.advanced_parameters(ui));
+    }
+
+    fn advanced_parameters(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("advanced-params").show(ui, |ui| {
             for (label, value, minimum) in [
-                ("Triangles", &mut self.params.num_triangles, 0),
                 ("Generations", &mut self.params.num_generations, 0),
                 ("Population size", &mut self.params.population_size, 1),
                 ("Selected", &mut self.params.num_selected, 1),
@@ -130,17 +159,15 @@ impl TriKlopsApp {
                 ui.end_row();
             }
             self.params.seed = self.use_seed.then(|| self.seed.parse().ok()).flatten();
-            ui.label("Use angle threshold");
-            let mut enabled = self.params.degeneracy_threshold.is_some();
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.params.degeneracy_threshold = enabled.then_some(1.0);
+            ui.label("Minimum angle");
+            let mut angle = self.params.degeneracy_threshold.unwrap_or(0.0);
+            if ui
+                .add(egui::DragValue::new(&mut angle).speed(0.1).suffix("°"))
+                .changed()
+            {
+                self.params.degeneracy_threshold = (angle > 0.0).then_some(angle);
             }
             ui.end_row();
-            if let Some(angle) = &mut self.params.degeneracy_threshold {
-                ui.label("Minimum angle");
-                ui.add(egui::DragValue::new(angle).speed(0.1).suffix("°"));
-                ui.end_row();
-            }
         });
     }
 
@@ -198,7 +225,9 @@ impl eframe::App for TriKlopsApp {
         self.update_preview(ui.ctx(), &progress);
         egui::Panel::left("controls")
             .exact_size(230.0)
-            .show(ui, |ui| self.controls(ui, &progress));
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| self.controls(ui, &progress));
+            });
         egui::CentralPanel::default().show(ui, |ui| {
             ui.horizontal(|ui| {
                 for texture in [
