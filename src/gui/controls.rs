@@ -1,4 +1,5 @@
 use super::TriKlopsApp;
+use super::parameters::help_button;
 #[cfg(target_arch = "wasm32")]
 use super::platform::DownloadFormat;
 use eframe::egui::{self, Color32};
@@ -21,12 +22,26 @@ impl TriKlopsApp {
             .frame(controls_frame(ui, 16))
             .show(ui, |ui| {
                 style_controls(ui, false);
-                egui::ScrollArea::vertical().show(ui, |ui| self.sidebar(ui, progress));
+                egui::Panel::bottom("sidebar actions")
+                    .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                        top: 8,
+                        ..Default::default()
+                    }))
+                    .show(ui, |ui| self.sidebar_actions(ui, progress));
+                egui::ScrollArea::vertical().show(ui, |ui| self.sidebar_settings(ui));
             });
     }
 
-    fn sidebar(&mut self, ui: &mut egui::Ui, progress: &Progress) {
-        ui.label(egui::RichText::new("Reference image").strong().size(14.0));
+    fn sidebar_settings(&mut self, ui: &mut egui::Ui) {
+        ui.spacing_mut().item_spacing.y = 5.0;
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Reference image").strong().size(14.0));
+            help_button(
+                ui,
+                "Reference image",
+                "The image Tri-Klops tries to recreate with triangles. It is processed on this device.",
+            );
+        });
         self.image_control(ui, 34.0);
         if let Some(name) = self.reference.as_ref().and_then(|r| r.path.file_name()) {
             let name = name.to_string_lossy();
@@ -36,8 +51,9 @@ impl TriKlopsApp {
 
         ui.separator();
         ui.add_enabled_ui(self.can_edit_settings(), |ui| self.parameters(ui));
-        ui.separator();
+    }
 
+    fn sidebar_actions(&mut self, ui: &mut egui::Ui, progress: &Progress) {
         self.process_control(ui, "Start processing", "Stop processing", 34.0);
         #[cfg(target_arch = "wasm32")]
         if self.browser.has_output() {

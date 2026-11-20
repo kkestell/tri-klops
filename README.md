@@ -44,7 +44,7 @@ npx wrangler pages deploy target/web --project-name tri-klops --branch main
 
 **One at a time** (default) searches for the next triangle to add. Each accepted triangle stays in place.
 
-**Whole drawing** adds triangles while regularly revisiting their shapes and colors. Once the drawing reaches the **Triangle limit**, the search focuses on improving existing triangles. It refits colors based on the visible parts of each triangle and frees slots taken by fully hidden triangles. **Generations** sets the search budget for the entire drawing. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
+**Whole drawing** adds triangles while regularly revisiting their shapes and colors. Once the drawing reaches the **Triangle limit**, the search focuses on improving existing triangles. It refits colors based on the visible parts of each triangle and frees slots taken by fully hidden triangles. Use the **Generations** slider under **Triangle limit** to set the search budget for the entire drawing. Click either slider’s number to enter an exact value. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
 
 Each mode keeps its own search settings while the app is open.
 
