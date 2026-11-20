@@ -62,12 +62,70 @@ pub(super) async fn best_triangle(
         if leader.gain > best.map_or(0, |c: Candidate| c.gain) {
             best = Some(leader);
         }
-        if !progress(generation, best).await || generation + 1 == params.num_generations {
+        if !progress(generation, best).await {
+            return best;
+        }
+        if generation + 1 == params.num_generations {
             break;
         }
         let parents = &ranked[..params.num_selected.min(ranked.len())];
         for shape in &mut shapes {
             *shape = breed(parents, dimensions, params, rng);
+        }
+    }
+    best.map(|best| refine_vertices(best, rows, &rules, params.grid_spacing))
+}
+
+fn refine_vertices(
+    mut best: Candidate,
+    rows: &ScoreRows,
+    rules: &ShapeRules,
+    grid_spacing: u16,
+) -> Candidate {
+    let grid = i32::from(grid_spacing).max(1);
+    let longest_side = rows.dimensions.0.max(rows.dimensions.1) as i32;
+    let max_steps = (longest_side / 16 / grid).max(1);
+    // Finish with grid-sized moves so that near misses can still improve.
+    for shift in (0..=max_steps.ilog2()).rev() {
+        let step = grid << shift;
+        let refined = refine_at_step(best, rows, rules, step);
+        if refined.gain > best.gain {
+            // A move can make a different corner worth revisiting at this scale.
+            best = refine_at_step(refined, rows, rules, step);
+        }
+    }
+    best
+}
+
+fn refine_at_step(
+    mut best: Candidate,
+    rows: &ScoreRows,
+    rules: &ShapeRules,
+    step: i32,
+) -> Candidate {
+    let offsets = [
+        [-step, 0],
+        [step, 0],
+        [0, -step],
+        [0, step],
+        [-step, -step],
+        [-step, step],
+        [step, -step],
+        [step, step],
+    ];
+    for corner in 0..3 {
+        let start = best.triangle.vertices;
+        for [dx, dy] in offsets {
+            let mut vertices = start;
+            vertices[corner][0] += dx;
+            vertices[corner][1] += dy;
+            if !rules.allows(vertices) {
+                continue;
+            }
+            let candidate = rows.fit(vertices);
+            if candidate.gain > best.gain {
+                best = candidate;
+            }
         }
     }
     best
@@ -106,6 +164,32 @@ fn breed(
 mod tests {
     use super::*;
     use image::RgbImage;
+
+    #[test]
+    fn refinement_recovers_a_corner_one_grid_step_away() {
+        let canvas = RgbImage::new(32, 32);
+        let mut reference = canvas.clone();
+        let target = Triangle {
+            vertices: [[4, 4], [28, 4], [4, 28]],
+            color: [200, 100, 50],
+        };
+        target.paint(&mut reference);
+        let rows = ScoreRows::new(&reference, &canvas);
+        let initial = rows.fit([[4, 4], [26, 6], [4, 28]]);
+        let params = AlgorithmParams {
+            grid_spacing: 2,
+            ..Default::default()
+        };
+        let refined = refine_vertices(
+            initial,
+            &rows,
+            &ShapeRules::new(&params),
+            params.grid_spacing,
+        );
+        assert!(initial.gain < refined.gain);
+        assert_eq!(refined.gain, rows.error);
+        assert_eq!(refined.triangle, target);
+    }
 
     #[test]
     fn fit_and_angle_check_use_snapped_vertices() {
