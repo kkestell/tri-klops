@@ -43,7 +43,7 @@ pub(super) async fn best_triangle(
         .map(|_| Proposal::New(initial_shape(reference, canvas, rng)))
         .collect();
     let rules = ShapeRules::new(params);
-    let size = reference.width() as i32;
+    let dimensions = [reference.width() as i32, reference.height() as i32];
     let mut best = None;
     let mut ranked = Vec::with_capacity(shapes.len());
     for generation in 0..params.num_generations {
@@ -69,7 +69,7 @@ pub(super) async fn best_triangle(
         }
         let parents = &ranked[..params.num_selected.min(ranked.len())];
         for shape in &mut shapes {
-            *shape = breed(parents, size, params, rng);
+            *shape = breed(parents, dimensions, params, rng);
         }
     }
     best
@@ -77,7 +77,7 @@ pub(super) async fn best_triangle(
 
 fn breed(
     parents: &[Candidate],
-    size: i32,
+    dimensions: [i32; 2],
     params: &AlgorithmParams,
     rng: &mut SmallRng,
 ) -> Proposal {
@@ -91,7 +91,7 @@ fn breed(
             b.triangle.vertices[i]
         };
         if rng.random_bool(params.mutation_rate) {
-            jitter(&mut vertex, size, params.grid_spacing, rng);
+            jitter(&mut vertex, dimensions, params.grid_spacing, rng);
         }
         vertex
     });

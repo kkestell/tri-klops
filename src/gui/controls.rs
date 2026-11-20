@@ -89,7 +89,7 @@ impl TriKlopsApp {
             #[cfg(target_arch = "wasm32")]
             self.download_control(ui);
         }
-        if progress.canvas.is_some() {
+        if progress.drawing.is_some() {
             ui.weak(format!("Fitness: {:.2}", progress.current_fitness));
         }
         if let Some(error) = &self.error {

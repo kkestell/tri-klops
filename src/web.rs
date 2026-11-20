@@ -2,8 +2,8 @@ use crate::gui::TriKlopsApp;
 use image::RgbImage;
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
-use triklops::algo::{AlgorithmParams, Progress, approximate};
+use std::sync::{Arc, Mutex};
+use triklops::algo::{AlgorithmParams, Drawing, Progress, Triangle, approximate};
 use wasm_bindgen::{JsCast, prelude::*};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{DedicatedWorkerGlobalScope, HtmlCanvasElement};
@@ -11,6 +11,7 @@ use web_sys::{DedicatedWorkerGlobalScope, HtmlCanvasElement};
 #[derive(Serialize, Deserialize)]
 pub(crate) struct RunRequest {
     pub params: AlgorithmParams,
+    pub dimensions: (u32, u32),
     #[serde(with = "serde_bytes")]
     pub reference: Vec<u8>,
 }
@@ -30,7 +31,8 @@ pub(crate) struct Preview {
     pub generation_index: usize,
     pub fitness: f64,
     pub revision: usize,
-    pub pixels: Option<serde_bytes::ByteBuf>,
+    pub drawing: Option<Arc<Drawing>>,
+    pub candidate: Option<Triangle>,
 }
 
 #[wasm_bindgen]
@@ -47,9 +49,19 @@ pub async fn start_app(canvas: HtmlCanvasElement) -> Result<(), JsValue> {
 #[wasm_bindgen]
 pub async fn generate(request: JsValue, check_stop: Function) -> Result<String, JsValue> {
     let request: RunRequest = serde_wasm_bindgen::from_value(request)?;
-    let size = request.params.image_size;
-    let reference = RgbImage::from_raw(size, size, request.reference)
-        .ok_or_else(|| JsValue::from_str("Invalid reference dimensions."))?;
+    let (width, height) = request.dimensions;
+    let expected_bytes = width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(3));
+    if width == 0
+        || height == 0
+        || width.max(height) != request.params.image_size
+        || expected_bytes.map(|bytes| bytes as usize) != Some(request.reference.len())
+    {
+        return Err(JsValue::from_str("Invalid reference dimensions."));
+    }
+    let reference =
+        RgbImage::from_raw(width, height, request.reference).expect("validated RGB buffer");
     let worker: DedicatedWorkerGlobalScope = js_sys::global().unchecked_into();
     let clock = worker.performance().unwrap();
     let progress = Mutex::new(Progress::default());
@@ -86,17 +98,11 @@ fn send_preview(
     progress: &Progress,
     revision: &mut usize,
 ) -> Result<(), JsValue> {
-    let pixels = if progress.revision == *revision {
+    let drawing = if progress.revision == *revision {
         None
     } else {
         *revision = progress.revision;
-        progress.canvas.as_ref().map(|canvas| {
-            let mut preview = (**canvas).clone();
-            if let Some(candidate) = progress.candidate {
-                candidate.paint(&mut preview);
-            }
-            serde_bytes::ByteBuf::from(preview.into_raw())
-        })
+        progress.drawing.clone()
     };
     let message = WorkerMessage::Preview(Preview {
         triangle_index: progress.triangle_index,
@@ -104,7 +110,8 @@ fn send_preview(
         generation_index: progress.generation_index,
         fitness: progress.current_fitness,
         revision: progress.revision,
-        pixels,
+        drawing,
+        candidate: progress.candidate,
     });
     worker.post_message(&serde_wasm_bindgen::to_value(&message)?)
 }

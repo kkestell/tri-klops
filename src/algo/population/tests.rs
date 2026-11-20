@@ -54,7 +54,7 @@ fn local_refinement_can_move_a_single_grid_coordinate() {
     let before = triangle;
     nudge(
         &mut triangle,
-        32,
+        [32; 2],
         params.grid_spacing,
         &ShapeRules::new(&params),
         &mut SmallRng::seed_from_u64(42),

@@ -4,6 +4,7 @@ use std::ops::Range;
 pub(super) type Vertices = [[i32; 2]; 3];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct Triangle {
     pub vertices: Vertices,
     pub color: [u8; 3],

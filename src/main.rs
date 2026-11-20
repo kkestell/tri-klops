@@ -17,6 +17,7 @@ fn main() -> eframe::Result {
     let app_name = "Tri-Klops";
     env_logger::init();
     let options = eframe::NativeOptions {
+        multisampling: 4,
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([832.0, 480.0])
             .with_title(app_name),

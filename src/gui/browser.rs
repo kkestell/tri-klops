@@ -1,9 +1,9 @@
 use super::TriKlopsApp;
 use crate::web::{RunRequest, WorkerMessage};
 use eframe::egui;
-use image::{DynamicImage, RgbImage};
+use image::DynamicImage;
 use js_sys::{Promise, Uint8Array};
-use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{ErrorEvent, File, MessageEvent, WorkerOptions, WorkerType};
@@ -76,6 +76,7 @@ impl TriKlopsApp {
         let reference = self.reference.as_ref().unwrap();
         let request = serde_wasm_bindgen::to_value(&RunRequest {
             params: self.params.clone(),
+            dimensions: reference.image.dimensions(),
             reference: reference.image.as_raw().clone(),
         })?;
         let options = WorkerOptions::new();
@@ -84,7 +85,6 @@ impl TriKlopsApp {
         let result = Rc::new(RefCell::new(None));
 
         let progress = self.progress.clone();
-        let size = reference.image.width();
         let message = Closure::new({
             let result = result.clone();
             let ctx = ctx.clone();
@@ -92,10 +92,10 @@ impl TriKlopsApp {
                 match serde_wasm_bindgen::from_value(event.data()) {
                     Ok(WorkerMessage::Preview(preview)) => {
                         let mut progress = progress.lock().unwrap();
-                        if let Some(pixels) = preview.pixels {
-                            progress.canvas =
-                                RgbImage::from_raw(size, size, pixels.into_vec()).map(Arc::new);
+                        if let Some(drawing) = preview.drawing {
+                            progress.drawing = Some(drawing);
                         }
+                        progress.candidate = preview.candidate;
                         progress.triangle_index = preview.triangle_index;
                         progress.triangle_count = preview.triangle_count;
                         progress.generation_index = preview.generation_index;

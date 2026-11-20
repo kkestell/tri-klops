@@ -29,6 +29,7 @@ pub enum SearchMode {
 pub struct AlgorithmParams {
     pub mode: SearchMode,
     pub num_triangles: usize,
+    /// Length of the longest side of the processing canvas, in pixels.
     pub image_size: u32,
     pub num_generations: usize,
     pub population_size: usize,
@@ -44,17 +45,23 @@ impl Default for AlgorithmParams {
     fn default() -> Self {
         Self {
             mode: SearchMode::Greedy,
-            num_triangles: 1024,
+            num_triangles: 2048,
             image_size: 256,
-            num_generations: 512,
+            num_generations: 1024,
             population_size: 128,
             num_selected: 64,
             mutation_rate: 0.1,
-            degeneracy_threshold: None,
+            degeneracy_threshold: Some(9.0),
             grid_spacing: 1,
             seed: None,
         }
     }
+}
+
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
+pub struct Drawing {
+    pub background: [u8; 3],
+    pub triangles: Vec<Triangle>,
 }
 
 #[derive(Clone, Default)]
@@ -65,6 +72,7 @@ pub struct Progress {
     pub current_fitness: f64,
     pub should_stop: bool,
     pub canvas: Option<Arc<RgbImage>>,
+    pub drawing: Option<Arc<Drawing>>,
     pub candidate: Option<Triangle>,
     pub revision: usize,
 }
@@ -88,9 +96,19 @@ impl Progress {
         }
     }
 
-    fn publish_canvas(&mut self, canvas: &RgbImage, error: i64, triangle_count: usize) {
-        self.triangle_count = triangle_count;
+    fn publish_drawing(
+        &mut self,
+        canvas: &RgbImage,
+        error: i64,
+        background: [u8; 3],
+        triangles: &[Triangle],
+    ) {
+        self.triangle_count = triangles.len();
         self.canvas = Some(Arc::new(canvas.clone()));
+        self.drawing = Some(Arc::new(Drawing {
+            background,
+            triangles: triangles.to_vec(),
+        }));
         self.current_fitness = fitness(error, canvas.dimensions());
         self.candidate = None;
         self.revision += 1;
@@ -129,15 +147,15 @@ pub async fn approximate(
     progress: &Mutex<Progress>,
     mut checkpoint: impl AsyncFnMut(&Mutex<Progress>),
 ) -> Document {
-    let size = params.image_size;
-    assert!(size > 0 && reference.dimensions() == (size, size));
+    let (width, height) = reference.dimensions();
+    assert!(width > 0 && height > 0 && width.max(height) == params.image_size);
     assert!(params.population_size > 0 && params.num_selected > 0);
     assert!((0.0..=1.0).contains(&params.mutation_rate));
     let mut rng = params
         .seed
         .map_or_else(rand::make_rng, SmallRng::seed_from_u64);
     let background = mean_color(reference);
-    let canvas = RgbImage::from_pixel(size, size, Rgb(background));
+    let canvas = RgbImage::from_pixel(width, height, Rgb(background));
     let triangles = match params.mode {
         SearchMode::Greedy => {
             greedy(
@@ -162,7 +180,7 @@ pub async fn approximate(
             .await
         }
     };
-    svg_document(size, background, &triangles)
+    svg_document((width, height), background, &triangles)
 }
 
 async fn greedy(
@@ -175,10 +193,11 @@ async fn greedy(
 ) -> Vec<Triangle> {
     let mut triangles = Vec::new();
     let mut rows = ScoreRows::new(reference, &canvas);
+    let background = canvas.get_pixel(0, 0).0;
     progress
         .lock()
         .unwrap()
-        .publish_canvas(&canvas, rows.error, 0);
+        .publish_drawing(&canvas, rows.error, background, &triangles);
     checkpoint(progress).await;
     for triangle_index in 0..params.num_triangles {
         if rows.error == 0 || progress.lock().unwrap().should_stop {
@@ -207,23 +226,27 @@ async fn greedy(
             progress
                 .lock()
                 .unwrap()
-                .publish_canvas(&canvas, rows.error, triangles.len());
+                .publish_drawing(&canvas, rows.error, background, &triangles);
             checkpoint(progress).await;
         }
     }
     triangles
 }
 
-fn svg_document(size: u32, background: [u8; 3], triangles: &[Triangle]) -> Document {
+fn svg_document(
+    (width, height): (u32, u32),
+    background: [u8; 3],
+    triangles: &[Triangle],
+) -> Document {
     let mut document = Document::new()
-        .set("width", size)
-        .set("height", size)
-        .set("viewBox", (0, 0, size, size))
+        .set("width", width)
+        .set("height", height)
+        .set("viewBox", (0, 0, width, height))
         .set("overflow", "hidden")
         .add(
             Rectangle::new()
-                .set("width", size)
-                .set("height", size)
+                .set("width", width)
+                .set("height", height)
                 .set("fill", fill(background)),
         );
 
@@ -236,4 +259,46 @@ fn svg_document(size: u32, background: [u8; 3], triangles: &[Triangle]) -> Docum
         );
     }
     document
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rectangular_drawings_match_the_scoring_canvas_and_svg() {
+        for (width, height) in [(32, 12), (12, 32)] {
+            let reference = RgbImage::from_fn(width, height, |x, y| {
+                Rgb([(x * 7) as u8, (y * 7) as u8, 128])
+            });
+            for mode in [SearchMode::Greedy, SearchMode::WholeDrawing] {
+                let params = AlgorithmParams {
+                    mode,
+                    image_size: 32,
+                    num_triangles: 8,
+                    num_generations: 8,
+                    population_size: 12,
+                    num_selected: 4,
+                    seed: Some(42),
+                    ..Default::default()
+                };
+                let progress = Mutex::new(Progress::default());
+                let svg =
+                    pollster::block_on(approximate(&params, &reference, &progress, async |_| {}))
+                        .to_string();
+                let progress = progress.into_inner().unwrap();
+                let drawing = progress.drawing.unwrap();
+                assert!(!drawing.triangles.is_empty());
+                assert!(progress.candidate.is_none());
+                assert!(svg.contains(&format!("viewBox=\"0 0 {width} {height}\"")));
+                assert_eq!(svg.matches("<polygon").count(), drawing.triangles.len());
+
+                let mut painted = RgbImage::from_pixel(width, height, Rgb(drawing.background));
+                for triangle in &drawing.triangles {
+                    triangle.paint(&mut painted);
+                }
+                assert_eq!(progress.canvas.as_deref(), Some(&painted));
+            }
+        }
+    }
 }

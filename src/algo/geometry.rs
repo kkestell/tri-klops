@@ -7,15 +7,15 @@ pub(super) fn initial_shape(
     canvas: &RgbImage,
     rng: &mut SmallRng,
 ) -> Vertices {
-    let size = reference.width() as i32;
+    let dimensions = [reference.width() as i32, reference.height() as i32];
     if rng.random_bool(0.5) {
-        return std::array::from_fn(|_| [rng.random_range(0..=size), rng.random_range(0..=size)]);
+        return std::array::from_fn(|_| dimensions.map(|size| rng.random_range(0..=size)));
     }
 
     // Center local proposals near a poorly matched pixel. Several scales let
     // the same search cover large silhouettes and small remaining details.
     let center = (0..8)
-        .map(|_| [rng.random_range(0..size), rng.random_range(0..size)])
+        .map(|_| dimensions.map(|size| rng.random_range(0..size)))
         .max_by_key(|&[x, y]| {
             let target = reference.get_pixel(x as u32, y as u32);
             let current = canvas.get_pixel(x as u32, y as u32);
@@ -24,8 +24,14 @@ pub(super) fn initial_shape(
                 .sum::<i32>()
         })
         .unwrap();
-    let radius = (size >> rng.random_range(0..=4)).max(1);
-    std::array::from_fn(|_| center.map(|v| v + rng.random_range(-radius..=radius)))
+    let shift = rng.random_range(0..=4);
+    let radii = dimensions.map(|size| (size >> shift).max(1));
+    std::array::from_fn(|_| {
+        std::array::from_fn(|axis| {
+            let radius = radii[axis];
+            center[axis] + rng.random_range(-radius..=radius)
+        })
+    })
 }
 
 fn meets_angle_limit(vertices: Vertices, max_cosine: f64) -> bool {
@@ -72,9 +78,14 @@ impl ShapeRules {
     }
 }
 
-pub(super) fn jitter(vertex: &mut [i32; 2], size: i32, spacing: u16, rng: &mut SmallRng) {
-    let step = (size / 10).max(i32::from(spacing)).max(1);
-    for coord in vertex {
+pub(super) fn jitter(
+    vertex: &mut [i32; 2],
+    dimensions: [i32; 2],
+    spacing: u16,
+    rng: &mut SmallRng,
+) {
+    for (coord, size) in vertex.iter_mut().zip(dimensions) {
+        let step = (size / 10).max(i32::from(spacing)).max(1);
         *coord = (*coord + rng.random_range(-step..=step)).clamp(-size, 2 * size);
     }
 }

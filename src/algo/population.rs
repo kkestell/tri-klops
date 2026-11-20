@@ -19,9 +19,18 @@ fn crossover(parents: &[Drawing], limit: usize, rng: &mut SmallRng) -> Vec<Trian
     triangles
 }
 
-fn nudge(triangle: &mut Triangle, size: i32, spacing: u16, rules: &ShapeRules, rng: &mut SmallRng) {
+fn nudge(
+    triangle: &mut Triangle,
+    dimensions: [i32; 2],
+    spacing: u16,
+    rules: &ShapeRules,
+    rng: &mut SmallRng,
+) {
     let mut vertices = triangle.vertices;
-    let coord = &mut vertices[rng.random_range(0..3)][rng.random_range(0..2)];
+    let vertex = &mut vertices[rng.random_range(0..3)];
+    let axis = rng.random_range(0..2);
+    let coord = &mut vertex[axis];
+    let size = dimensions[axis];
     let grid = i32::from(spacing).max(1);
     // Sample powers of two so a single grid step remains common on large canvases.
     let max_steps = (size / 10 / grid).max(1);
@@ -61,7 +70,7 @@ fn offspring(
         let index = rng.random_range(0..triangles.len());
         nudge(
             &mut triangles[index],
-            reference.width() as i32,
+            [reference.width() as i32, reference.height() as i32],
             params.grid_spacing,
             rules,
             rng,
@@ -104,7 +113,7 @@ pub(super) async fn evolve(
     progress
         .lock()
         .unwrap()
-        .publish_canvas(&canvas, empty.error, 0);
+        .publish_drawing(&canvas, empty.error, background, &empty.triangles);
     checkpoint(progress).await;
     let mut parents = vec![empty];
     let rules = ShapeRules::new(params);
@@ -147,7 +156,7 @@ pub(super) async fn evolve(
             let mut progress = progress.lock().unwrap();
             progress.generation_index = generation;
             if improved {
-                progress.publish_canvas(&canvas, best.error, best.triangles.len());
+                progress.publish_drawing(&canvas, best.error, background, &best.triangles);
             }
         }
         checkpoint(progress).await;

@@ -19,6 +19,8 @@ cargo run --release --locked
 
 Load a reference image and choose **Start processing**. When the run finishes, or when you stop it, Tri-Klops saves an SVG next to the reference image using the same filename stem. An existing SVG at that path is replaced.
 
+Portrait, landscape, and square images keep their framing in the preview and exported SVG.
+
 ### Browser build
 
 Open [Tri-Klops in your browser](https://tri-klops.pages.dev). The app processes images locally in a Web Worker. Choose **Download SVG** after the run finishes or after you stop it.
