@@ -1,7 +1,7 @@
 [Setup]
 AppId={{c447ed56-3520-4c8e-a3a7-9c82d001a824}}
 AppName=Tri-Klops
-AppVersion=0.3.0
+AppVersion={#AppVersion}
 AppVerName=Tri-Klops
 AppPublisher=Kyle Kestell
 AppPublisherURL=https://github.com/kkestell/tri-klops
@@ -14,7 +14,7 @@ DisableProgramGroupPage=yes
 LicenseFile=LICENSE
 PrivilegesRequired=lowest
 OutputDir=publish
-OutputBaseFilename=Tri-Klops_0.3.0_Setup
+OutputBaseFilename=Tri-Klops_{#AppVersion}_Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

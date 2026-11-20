@@ -1,0 +1,33 @@
+name: Windows installer
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    if: ${{ !github.event.deleted }}
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Update Rust stable
+        run: rustup update stable --no-self-update
+
+      - name: Build x64 installer
+        run: .\install.ps1 -ReleaseTag $env:GITHUB_REF_NAME
+
+      - name: Upload Windows binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: Tri-Klops-Windows-x64-${{ github.ref_name }}
+          path: |
+            publish/Tri-Klops_*_Setup.exe
+            target/release/triklops.exe
+          if-no-files-found: error

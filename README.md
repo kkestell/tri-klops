@@ -45,6 +45,8 @@ A further optimization on the same M4 reduced the short benchmark from 18.8 ms t
 
 ## Package a release
 
+Pushing a `vMAJOR.MINOR.PATCH` tag that matches the version in `Cargo.toml` builds the x64 Windows installer in GitHub Actions. Download it from the completed **Windows installer** run under **Artifacts**.
+
 - On macOS, run `./publish-macos.sh` with the Xcode command-line tools installed to build the Intel and Apple Silicon app and zip archive.
 - On x64 Windows, install Inno Setup 6 and run `.\install.ps1` in PowerShell to create the installer in `publish\`.
 
