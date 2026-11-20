@@ -1,9 +1,9 @@
-use super::TriKlopsApp;
+use super::{TriKlopsApp, decode_reference};
 use crate::web::{RunRequest, WorkerMessage};
 use eframe::egui;
-use image::DynamicImage;
+use image::{DynamicImage, ImageReader};
 use js_sys::{Promise, Uint8Array};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, io::Cursor, path::PathBuf, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{ErrorEvent, File, MessageEvent, WorkerOptions, WorkerType};
@@ -13,27 +13,44 @@ extern "C" {
     #[wasm_bindgen(catch, js_name = pickReference)]
     fn pick_reference() -> Result<Promise, JsValue>;
 
-    #[wasm_bindgen(catch, js_name = downloadSvg)]
-    fn download_svg(name: &str, svg: &str) -> Result<(), JsValue>;
+    #[wasm_bindgen(catch, js_name = downloadFile)]
+    fn download_file(name: &str, mime_type: &str, contents: &JsValue) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = renderJpg)]
+    fn render_jpg(svg: &str) -> Promise;
 }
 
 type PickedImage = Result<Option<(PathBuf, DynamicImage)>, String>;
 
+struct CompletedDrawing {
+    svg: String,
+    jpg: Result<JsValue, JsValue>,
+}
+
+pub(super) enum DownloadFormat {
+    Svg,
+    Jpg,
+}
+
 #[derive(Default)]
 pub(super) struct Browser {
     picker: Option<Rc<RefCell<Option<PickedImage>>>>,
-    svg: Option<String>,
+    output: Option<CompletedDrawing>,
 }
 
 impl Browser {
     pub(super) fn is_loading(&self) -> bool {
         self.picker.is_some()
     }
+
+    pub(super) fn has_output(&self) -> bool {
+        self.output.is_some()
+    }
 }
 
 pub(super) struct Worker {
     handle: web_sys::Worker,
-    result: Rc<RefCell<Option<Result<String, String>>>>,
+    result: Rc<RefCell<Option<Result<CompletedDrawing, String>>>>,
     _message: Closure<dyn FnMut(MessageEvent)>,
     _error: Closure<dyn FnMut(ErrorEvent)>,
 }
@@ -65,7 +82,7 @@ impl TriKlopsApp {
     }
 
     pub(super) fn start_worker(&mut self, ctx: egui::Context) {
-        self.browser.svg = None;
+        self.browser.output = None;
         match self.launch_worker(ctx) {
             Ok(worker) => self.worker = Some(worker),
             Err(error) => self.error = Some(format!("Could not start image generation: {error:?}")),
@@ -102,7 +119,16 @@ impl TriKlopsApp {
                         progress.current_fitness = preview.fitness;
                         progress.revision = preview.revision;
                     }
-                    Ok(WorkerMessage::Done { svg }) => *result.borrow_mut() = Some(Ok(svg)),
+                    Ok(WorkerMessage::Done { svg }) => {
+                        let result = result.clone();
+                        let ctx = ctx.clone();
+                        spawn_local(async move {
+                            // Prepare the JPG before the click so the download can start synchronously.
+                            let jpg = JsFuture::from(render_jpg(&svg)).await;
+                            *result.borrow_mut() = Some(Ok(CompletedDrawing { svg, jpg }));
+                            ctx.request_repaint();
+                        });
+                    }
                     Ok(WorkerMessage::Error { message }) => {
                         *result.borrow_mut() = Some(Err(message));
                     }
@@ -137,7 +163,7 @@ impl TriKlopsApp {
         }
     }
 
-    pub(super) fn poll_platform(&mut self, ctx: &egui::Context) {
+    pub(super) fn poll_platform(&mut self) {
         let picked = self
             .browser
             .picker
@@ -147,8 +173,8 @@ impl TriKlopsApp {
             self.browser.picker = None;
             match picked {
                 Ok(Some((path, image))) => {
-                    self.browser.svg = None;
-                    self.set_reference(ctx, path, image);
+                    self.browser.output = None;
+                    self.set_reference(path, image);
                 }
                 Ok(None) => {}
                 Err(error) => self.error = Some(error),
@@ -161,25 +187,33 @@ impl TriKlopsApp {
         if let Some(result) = result {
             self.worker = None;
             match result {
-                Ok(svg) => self.browser.svg = Some(svg),
+                Ok(output) => self.browser.output = Some(output),
                 Err(error) => self.error = Some(format!("Image generation failed: {error}")),
             }
         }
     }
 
-    pub(super) fn download_control(&mut self, ui: &mut egui::Ui) {
-        let Some(svg) = self.browser.svg.as_deref() else {
-            return;
+    pub(super) fn download_output(&mut self, format: DownloadFormat) {
+        let output = self.browser.output.as_ref().unwrap();
+        let (extension, mime_type, contents) = match format {
+            DownloadFormat::Svg => ("svg", "image/svg+xml", JsValue::from_str(&output.svg)),
+            DownloadFormat::Jpg => match &output.jpg {
+                Ok(jpg) => ("jpg", "image/jpeg", jpg.clone()),
+                Err(error) => {
+                    self.error = Some(format!("Could not render JPG: {error:?}"));
+                    return;
+                }
+            },
         };
-        if ui
-            .add(super::controls::sidebar_button(ui, "Download SVG"))
-            .clicked()
-        {
-            let path = self.reference.as_ref().unwrap().path.with_extension("svg");
-            if let Err(error) = download_svg(&path.to_string_lossy(), svg) {
-                self.error = Some(format!("Could not download SVG: {error:?}"));
-            }
-        }
+        let path = self
+            .reference
+            .as_ref()
+            .unwrap()
+            .path
+            .with_extension(extension);
+        self.error = download_file(&path.to_string_lossy(), mime_type, &contents)
+            .err()
+            .map(|error| format!("Could not download {}: {error:?}", extension.to_uppercase()));
     }
 }
 
@@ -194,7 +228,11 @@ async fn read_reference(promise: Promise) -> PickedImage {
     let buffer = JsFuture::from(file.array_buffer())
         .await
         .map_err(|e| format!("Could not read {name}: {e:?}"))?;
-    let image = image::load_from_memory(&Uint8Array::new(&buffer).to_vec())
+    let bytes = Uint8Array::new(&buffer).to_vec();
+    let image = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(image::ImageError::from)
+        .and_then(decode_reference)
         .map_err(|e| format!("Could not load {name}: {e}"))?;
     Ok(Some((PathBuf::from(name), image)))
 }

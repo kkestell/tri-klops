@@ -1,5 +1,7 @@
 use super::*;
+use crate::algo::geometry::ShapeRules;
 use crate::algo::mean_color;
+use image::Rgb;
 use rand::SeedableRng;
 
 #[test]
@@ -26,6 +28,7 @@ fn colors_fit_the_visible_part_of_each_layer() {
         triangle.color = [0; 3];
     }
     let mut drawing = Drawing {
+        background,
         triangles,
         error: 0,
     };
@@ -36,7 +39,7 @@ fn colors_fit_the_visible_part_of_each_layer() {
         .iter()
         .map(|&v| i64::from(v).pow(2))
         .sum();
-    drawing.fit(&reference, background, target_squared, &mut [0; 100]);
+    drawing.fit(&reference, target_squared, &mut [0; 100]);
     assert_eq!(drawing.triangles, expected);
     assert_eq!(drawing.error, 100);
 }
@@ -47,23 +50,20 @@ fn local_refinement_can_move_a_single_grid_coordinate() {
         grid_spacing: 4,
         ..Default::default()
     };
-    let mut triangle = Triangle {
+    let triangle = Triangle {
         vertices: [[4, 4], [20, 4], [4, 20]],
         color: [0; 3],
     };
-    let before = triangle;
-    nudge(
-        &mut triangle,
+    let moved = nudge(
+        triangle.vertices,
         [32; 2],
         params.grid_spacing,
-        &ShapeRules::new(&params),
         &mut SmallRng::seed_from_u64(42),
     );
-    let changes: Vec<_> = triangle
-        .vertices
+    let changes: Vec<_> = moved
         .iter()
         .flatten()
-        .zip(before.vertices.iter().flatten())
+        .zip(triangle.vertices.iter().flatten())
         .filter(|(a, b)| a != b)
         .map(|(a, b)| (a - b).abs())
         .collect();

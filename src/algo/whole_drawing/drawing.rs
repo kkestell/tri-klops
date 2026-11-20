@@ -1,9 +1,10 @@
 use super::Triangle;
 use crate::algo::raster::spans;
-use image::RgbImage;
+use image::{Rgb, RgbImage};
 
 #[derive(Default)]
 pub(super) struct Drawing {
+    pub(super) background: [u8; 3],
     pub(super) triangles: Vec<Triangle>,
     pub(super) error: i64,
 }
@@ -30,13 +31,16 @@ impl Coverage {
 }
 
 impl Drawing {
-    pub(super) fn fit(
-        &mut self,
-        reference: &RgbImage,
-        background: [u8; 3],
-        target_squared: i64,
-        owners: &mut [usize],
-    ) {
+    pub(super) fn paint(&self, canvas: &mut RgbImage) {
+        canvas
+            .pixels_mut()
+            .for_each(|pixel| *pixel = Rgb(self.background));
+        for triangle in &self.triangles {
+            triangle.paint(canvas);
+        }
+    }
+
+    pub(super) fn fit(&mut self, reference: &RgbImage, target_squared: i64, owners: &mut [usize]) {
         let width = reference.width() as usize;
         owners.fill(0);
         for (index, triangle) in self.triangles.iter().enumerate() {
@@ -54,7 +58,7 @@ impl Drawing {
                 *sum += i64::from(value);
             }
         }
-        self.error = target_squared + coverage[0].color_error(background);
+        self.error = target_squared + coverage[0].color_error(self.background);
         let mut layers = coverage[1..].iter();
         self.triangles.retain_mut(|triangle| {
             let layer = layers.next().unwrap();

@@ -10,11 +10,11 @@ self.onmessage = async ({ data }) => {
 
   try {
     await init();
-    const svg = await generate(data, async () => {
+    const result = await generate(data, async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       return stopped;
     });
-    self.postMessage({ type: "done", svg });
+    self.postMessage(result);
   } catch (error) {
     self.postMessage({ type: "error", message: String(error) });
   }

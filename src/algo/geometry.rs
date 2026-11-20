@@ -5,6 +5,7 @@ use rand::{RngExt, rngs::SmallRng};
 pub(super) fn initial_shape(
     reference: &RgbImage,
     canvas: &RgbImage,
+    max_radius_shift: u32,
     rng: &mut SmallRng,
 ) -> Vertices {
     let dimensions = [reference.width() as i32, reference.height() as i32];
@@ -24,7 +25,7 @@ pub(super) fn initial_shape(
                 .sum::<i32>()
         })
         .unwrap();
-    let shift = rng.random_range(0..=4);
+    let shift = rng.random_range(0..=max_radius_shift);
     let radii = dimensions.map(|size| (size >> shift).max(1));
     std::array::from_fn(|_| {
         std::array::from_fn(|axis| {

@@ -1,8 +1,9 @@
 mod geometry;
-mod population;
 mod raster;
 mod search;
+mod whole_drawing;
 
+use geometry::initial_shape;
 use image::{Rgb, RgbImage};
 use rand::{SeedableRng, rngs::SmallRng};
 use std::sync::{Arc, Mutex};
@@ -43,14 +44,25 @@ pub struct AlgorithmParams {
 
 impl Default for AlgorithmParams {
     fn default() -> Self {
+        Self::for_mode(SearchMode::default())
+    }
+}
+
+impl AlgorithmParams {
+    /// Default search settings for the given mode.
+    pub fn for_mode(mode: SearchMode) -> Self {
+        let (num_generations, population_size, num_selected, mutation_rate) = match mode {
+            SearchMode::Greedy => (160, 80, 4, 0.20),
+            SearchMode::WholeDrawing => (2048, 64, 4, 0.15),
+        };
         Self {
-            mode: SearchMode::Greedy,
+            mode,
             num_triangles: 2048,
             image_size: 256,
-            num_generations: 1024,
-            population_size: 128,
-            num_selected: 64,
-            mutation_rate: 0.1,
+            num_generations,
+            population_size,
+            num_selected,
+            mutation_rate,
             degeneracy_threshold: Some(9.0),
             grid_spacing: 1,
             seed: None,
@@ -169,7 +181,7 @@ pub async fn approximate(
             .await
         }
         SearchMode::WholeDrawing => {
-            population::evolve(
+            whole_drawing::evolve(
                 params,
                 reference,
                 canvas,
@@ -205,10 +217,9 @@ async fn greedy(
         }
         let best = search::best_triangle(
             params,
-            reference,
-            &canvas,
             &rows,
             rng,
+            |rng| initial_shape(reference, &canvas, 4, rng),
             async |generation, best| {
                 progress
                     .lock()

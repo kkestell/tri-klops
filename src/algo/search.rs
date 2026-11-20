@@ -1,7 +1,6 @@
-use super::geometry::{ShapeRules, initial_shape, jitter};
+use super::geometry::{ShapeRules, jitter};
 use super::raster::{Candidate, ScoreRows, Vertices};
 use super::{AlgorithmParams, Triangle};
-use image::RgbImage;
 use rand::{RngExt, rngs::SmallRng};
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
@@ -33,17 +32,16 @@ impl Proposal {
 
 pub(super) async fn best_triangle(
     params: &AlgorithmParams,
-    reference: &RgbImage,
-    canvas: &RgbImage,
     rows: &ScoreRows,
     rng: &mut SmallRng,
+    mut seed_shape: impl FnMut(&mut SmallRng) -> Vertices,
     mut progress: impl AsyncFnMut(usize, Option<Candidate>) -> bool,
 ) -> Option<Candidate> {
     let mut shapes: Vec<_> = (0..params.population_size)
-        .map(|_| Proposal::New(initial_shape(reference, canvas, rng)))
+        .map(|_| Proposal::New(seed_shape(rng)))
         .collect();
     let rules = ShapeRules::new(params);
-    let dimensions = [reference.width() as i32, reference.height() as i32];
+    let dimensions = [rows.dimensions.0 as i32, rows.dimensions.1 as i32];
     let mut best = None;
     let mut ranked = Vec::with_capacity(shapes.len());
     for generation in 0..params.num_generations {
@@ -107,6 +105,7 @@ fn breed(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::RgbImage;
 
     #[test]
     fn fit_and_angle_check_use_snapped_vertices() {

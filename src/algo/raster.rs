@@ -76,24 +76,58 @@ pub(super) struct ScoreRows {
     stride: usize,
     pub(super) dimensions: (u32, u32),
     prefix: Vec<[i64; 4]>,
+    visible: Option<Vec<u32>>,
     pub error: i64,
 }
 
 impl ScoreRows {
     pub fn new(reference: &RgbImage, canvas: &RgbImage) -> Self {
-        let stride = reference.width() as usize + 1;
+        Self::build(reference, canvas, None)
+    }
+
+    pub fn under_layers(reference: &RgbImage, canvas: &RgbImage, above: &[Triangle]) -> Self {
+        if above.is_empty() {
+            return Self::new(reference, canvas);
+        }
+        let width = reference.width() as usize;
+        let mut hidden = vec![false; reference.as_raw().len() / 3];
+        for triangle in above {
+            spans(triangle.vertices, reference.dimensions(), |y, xs| {
+                if !xs.is_empty() {
+                    hidden[y * width + xs.start..y * width + xs.end].fill(true);
+                }
+            });
+        }
+        Self::build(reference, canvas, Some(&hidden))
+    }
+
+    fn build(reference: &RgbImage, canvas: &RgbImage, hidden: Option<&[bool]>) -> Self {
+        let width = reference.width() as usize;
+        let stride = width + 1;
         let mut prefix = Vec::with_capacity(stride * reference.height() as usize);
+        let mut visible = hidden.map(|_| Vec::with_capacity(prefix.capacity()));
         let mut error = 0;
-        for (target_row, canvas_row) in reference.rows().zip(canvas.rows()) {
+        for (y, (target_row, canvas_row)) in reference.rows().zip(canvas.rows()).enumerate() {
+            let hidden_row = hidden.map(|pixels| &pixels[y * width..(y + 1) * width]);
             let mut sums = [0; 4];
+            let mut count = 0;
             prefix.push(sums);
-            for (target, current) in target_row.zip(canvas_row) {
-                for c in 0..3 {
-                    let t = i64::from(target[c]);
-                    let diff = t - i64::from(current[c]);
-                    sums[c] += t;
-                    sums[3] += diff * diff - t * t;
-                    error += diff * diff;
+            if let Some(visible) = &mut visible {
+                visible.push(0);
+            }
+            for (x, (target, current)) in target_row.zip(canvas_row).enumerate() {
+                if hidden_row.is_none_or(|hidden| !hidden[x]) {
+                    count += 1;
+                    for c in 0..3 {
+                        let t = i64::from(target[c]);
+                        let diff = t - i64::from(current[c]);
+                        sums[c] += t;
+                        sums[3] += diff * diff - t * t;
+                        error += diff * diff;
+                    }
+                }
+                if let Some(visible) = &mut visible {
+                    visible.push(count);
                 }
                 prefix.push(sums);
             }
@@ -102,6 +136,7 @@ impl ScoreRows {
             stride,
             dimensions: reference.dimensions(),
             prefix,
+            visible,
             error,
         }
     }
@@ -109,6 +144,7 @@ impl ScoreRows {
     // For a fill C over target T, the fourth prefix component accumulates
     // |T - C|² - |T|² = |C|² - 2 C·T. Only this component changes.
     pub fn accept(&mut self, candidate: Candidate, canvas: &mut RgbImage) {
+        debug_assert!(self.visible.is_none());
         candidate.triangle.paint(canvas);
         let color = candidate.triangle.color.map(i64::from);
         let norm = color.iter().map(|v| v * v).sum::<i64>();
@@ -141,7 +177,9 @@ impl ScoreRows {
             for i in 0..4 {
                 sums[i] += end[i] - start[i];
             }
-            count += xs.len() as i64;
+            count += self.visible.as_ref().map_or(xs.len() as i64, |visible| {
+                i64::from(visible[row + xs.end]) - i64::from(visible[row + xs.start])
+            });
         });
 
         // The rounded mean minimizes squared error for an opaque fill.
@@ -234,5 +272,26 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn scoring_a_lower_layer_uses_only_its_visible_pixels() {
+        let lower = Triangle {
+            vertices: [[0, 0], [10, 0], [0, 10]],
+            color: [180, 70, 40],
+        };
+        let upper = Triangle {
+            vertices: [[0, 0], [10, 0], [10, 10]],
+            color: [10, 20, 230],
+        };
+        let mut reference = RgbImage::new(10, 10);
+        lower.paint(&mut reference);
+        upper.paint(&mut reference);
+
+        let mut canvas = RgbImage::new(10, 10);
+        upper.paint(&mut canvas);
+        let fitted = ScoreRows::under_layers(&reference, &canvas, &[upper]).fit(lower.vertices);
+        assert_eq!(fitted.triangle, lower);
+        assert_eq!(fitted.gain, ScoreRows::new(&reference, &canvas).error);
     }
 }

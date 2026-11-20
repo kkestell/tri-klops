@@ -23,7 +23,7 @@ Portrait, landscape, and square images keep their framing in the preview and exp
 
 ### Browser build
 
-Open [Tri-Klops in your browser](https://tri-klops.pages.dev). The app processes images locally in a Web Worker. Choose **Download SVG** after the run finishes or after you stop it.
+Open [Tri-Klops in your browser](https://tri-klops.pages.dev). The app processes images locally in a Web Worker. Choose **Download SVG** or **Download JPG** after the run finishes or after you stop it. JPGs are rendered from the finished drawing at 2,048 pixels on the longest side. On a phone, open **Settings** to adjust the search parameters.
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -44,7 +44,14 @@ npx wrangler pages deploy target/web --project-name tri-klops --branch main
 
 **One at a time** (default) searches for the next triangle to add. Each accepted triangle stays in place.
 
-**Whole drawing** evolves a population of complete drawings. Set **Triangle limit** to the maximum number of triangles in each drawing. As a drawing grows, the search spends more trials moving a single vertex of the best drawing. Other trials add, replace, or recombine triangles. Each trial refits the colors of visible triangles and frees any slots taken by fully hidden triangles. **Generations** sets the search budget for the entire drawing. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
+**Whole drawing** adds triangles while regularly revisiting their shapes and colors. Once the drawing reaches the **Triangle limit**, the search focuses on improving existing triangles. It refits colors based on the visible parts of each triangle and frees slots taken by fully hidden triangles. **Generations** sets the search budget for the entire drawing. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
+
+Each mode keeps its own search settings while the app is open.
+
+| Search mode | Generations | Population size | Selected | Mutation rate |
+| --- | ---: | ---: | ---: | ---: |
+| One at a time | 160 per triangle | 80 | 4 | 0.20 |
+| Whole drawing | 2,048 per drawing | 64 | 4 | 0.15 |
 
 ### Shaping the triangles
 

@@ -47,7 +47,7 @@ pub async fn start_app(canvas: HtmlCanvasElement) -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn generate(request: JsValue, check_stop: Function) -> Result<String, JsValue> {
+pub async fn generate(request: JsValue, check_stop: Function) -> Result<JsValue, JsValue> {
     let request: RunRequest = serde_wasm_bindgen::from_value(request)?;
     let (width, height) = request.dimensions;
     let expected_bytes = width
@@ -90,7 +90,9 @@ pub async fn generate(request: JsValue, check_stop: Function) -> Result<String, 
     .await;
 
     send_preview(&worker, &progress.into_inner().unwrap(), &mut revision)?;
-    Ok(drawing.to_string())
+    Ok(serde_wasm_bindgen::to_value(&WorkerMessage::Done {
+        svg: drawing.to_string(),
+    })?)
 }
 
 fn send_preview(
