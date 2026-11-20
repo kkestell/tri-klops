@@ -2,7 +2,7 @@
 
 Create images from triangles using a genetic algorithm.
 
-![Tri-Klops application screenshot](https://raw.githubusercontent.com/kkestell/tri-klops/main/screenshot.png)
+![Tri-Klops in Whole drawing mode showing a triangle rendering of The Great Wave off Kanagawa](./screenshot.png)
 
 ## Installation
 
