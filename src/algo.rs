@@ -20,8 +20,8 @@ use raster::{Candidate, ScoreRows, fitness};
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub enum SearchMode {
-    #[default]
     Greedy,
+    #[default]
     WholeDrawing,
 }
 
@@ -52,13 +52,13 @@ impl AlgorithmParams {
     /// Default search settings for the given mode.
     pub fn for_mode(mode: SearchMode) -> Self {
         let (num_generations, population_size, num_selected, mutation_rate) = match mode {
-            SearchMode::Greedy => (160, 80, 4, 0.20),
-            SearchMode::WholeDrawing => (2048, 64, 4, 0.15),
+            SearchMode::Greedy => (128, 80, 4, 0.20),
+            SearchMode::WholeDrawing => (8192, 64, 4, 0.15),
         };
         Self {
             mode,
-            num_triangles: 2048,
-            image_size: 256,
+            num_triangles: 8192,
+            image_size: 768,
             num_generations,
             population_size,
             num_selected,
@@ -219,7 +219,7 @@ async fn greedy(
             params,
             &rows,
             rng,
-            |rng| initial_shape(reference, &canvas, 4, rng),
+            |rng| initial_shape(reference, &canvas, 7, rng),
             async |generation, best| {
                 progress
                     .lock()
@@ -284,14 +284,13 @@ mod tests {
             });
             for mode in [SearchMode::Greedy, SearchMode::WholeDrawing] {
                 let params = AlgorithmParams {
-                    mode,
                     image_size: 32,
                     num_triangles: 8,
                     num_generations: 8,
                     population_size: 12,
                     num_selected: 4,
                     seed: Some(42),
-                    ..Default::default()
+                    ..AlgorithmParams::for_mode(mode)
                 };
                 let progress = Mutex::new(Progress::default());
                 let svg =

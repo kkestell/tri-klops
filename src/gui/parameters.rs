@@ -125,7 +125,7 @@ impl TriKlopsApp {
             parameter_row(
                 ui,
                 "Generations",
-                "How many search rounds to spend looking for each triangle. More rounds can find a better fit and take longer.",
+                "How many search rounds to spend on each triangle. Longer searches can start fresh with new shapes several times to find a better fit.",
                 |ui| {
                     ui.add(
                         egui::DragValue::new(&mut self.params.num_generations)
@@ -280,17 +280,18 @@ mod tests {
     #[test]
     fn switching_modes_preserves_each_modes_search_settings() {
         let mut app = TriKlopsApp::default();
+        assert!(app.params.mode == SearchMode::WholeDrawing);
         app.params.num_triangles = 123;
         app.params.num_generations = 77;
         app.params.population_size = 99;
         app.params.num_selected = 9;
         app.params.mutation_rate = 0.30;
-        let greedy = SearchSettings::from(&app.params);
+        let whole = SearchSettings::from(&app.params);
 
-        app.set_search_mode(SearchMode::WholeDrawing);
+        app.set_search_mode(SearchMode::Greedy);
         assert_eq!(
             SearchSettings::from(&app.params),
-            SearchSettings::from(&AlgorithmParams::for_mode(SearchMode::WholeDrawing))
+            SearchSettings::from(&AlgorithmParams::for_mode(SearchMode::Greedy))
         );
         assert_eq!(app.params.num_triangles, 123);
 
@@ -298,12 +299,12 @@ mod tests {
         app.params.population_size = 55;
         app.params.num_selected = 12;
         app.params.mutation_rate = 0.25;
-        let whole = SearchSettings::from(&app.params);
-        app.set_search_mode(SearchMode::WholeDrawing);
+        let greedy = SearchSettings::from(&app.params);
         app.set_search_mode(SearchMode::Greedy);
-        assert_eq!(SearchSettings::from(&app.params), greedy);
-
         app.set_search_mode(SearchMode::WholeDrawing);
         assert_eq!(SearchSettings::from(&app.params), whole);
+
+        app.set_search_mode(SearchMode::Greedy);
+        assert_eq!(SearchSettings::from(&app.params), greedy);
     }
 }

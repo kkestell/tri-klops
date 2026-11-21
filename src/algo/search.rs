@@ -1,9 +1,12 @@
 use super::geometry::{ShapeRules, jitter};
 use super::raster::{Candidate, ScoreRows, Vertices};
-use super::{AlgorithmParams, Triangle};
+use super::{AlgorithmParams, SearchMode, Triangle};
 use rand::{RngExt, rngs::SmallRng};
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
+
+const GREEDY_MAX_STARTS: usize = 4;
+const GREEDY_GENERATIONS_PER_START: usize = 32;
 
 #[derive(Clone, Copy)]
 enum Proposal {
@@ -37,14 +40,29 @@ pub(super) async fn best_triangle(
     mut seed_shape: impl FnMut(&mut SmallRng) -> Vertices,
     mut progress: impl AsyncFnMut(usize, Option<Candidate>) -> bool,
 ) -> Option<Candidate> {
-    let mut shapes: Vec<_> = (0..params.population_size)
-        .map(|_| Proposal::New(seed_shape(rng)))
-        .collect();
+    let starts = match params.mode {
+        SearchMode::Greedy => {
+            (params.num_generations / GREEDY_GENERATIONS_PER_START).clamp(1, GREEDY_MAX_STARTS)
+        }
+        SearchMode::WholeDrawing => 1,
+    };
+    let generations_per_start = params.num_generations.div_ceil(starts);
     let rules = ShapeRules::new(params);
     let dimensions = [rows.dimensions.0 as i32, rows.dimensions.1 as i32];
     let mut best = None;
-    let mut ranked = Vec::with_capacity(shapes.len());
+    let mut shapes = Vec::with_capacity(params.population_size);
+    let mut ranked = Vec::with_capacity(params.population_size);
     for generation in 0..params.num_generations {
+        if generation.is_multiple_of(generations_per_start) {
+            shapes.clear();
+            shapes.resize_with(params.population_size, || Proposal::New(seed_shape(rng)));
+        } else {
+            let parents = &ranked[..params.num_selected.min(ranked.len())];
+            for shape in &mut shapes {
+                *shape = breed(parents, dimensions, params, rng);
+            }
+        }
+
         // Small populations cost more to split across workers than to score locally.
         #[cfg(not(target_arch = "wasm32"))]
         shapes
@@ -64,13 +82,6 @@ pub(super) async fn best_triangle(
         }
         if !progress(generation, best).await {
             return best;
-        }
-        if generation + 1 == params.num_generations {
-            break;
-        }
-        let parents = &ranked[..params.num_selected.min(ranked.len())];
-        for shape in &mut shapes {
-            *shape = breed(parents, dimensions, params, rng);
         }
     }
     best.map(|best| refine_vertices(best, rows, &rules, params.grid_spacing))
@@ -164,6 +175,50 @@ fn breed(
 mod tests {
     use super::*;
     use image::RgbImage;
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn greedy_keeps_the_best_triangle_across_fresh_populations() {
+        use rand::SeedableRng;
+
+        let canvas = RgbImage::new(32, 32);
+        let mut reference = canvas.clone();
+        let small = Triangle {
+            vertices: [[2, 2], [8, 2], [2, 8]],
+            color: [80; 3],
+        };
+        let large = Triangle {
+            vertices: [[12, 12], [30, 12], [12, 30]],
+            color: [180; 3],
+        };
+        small.paint(&mut reference);
+        large.paint(&mut reference);
+        let rows = ScoreRows::new(&reference, &canvas);
+        let params = AlgorithmParams {
+            num_generations: 128,
+            population_size: 1,
+            mutation_rate: 0.0,
+            ..AlgorithmParams::for_mode(SearchMode::Greedy)
+        };
+        let mut seeds = [small, small, large, small].into_iter();
+        let mut rounds = 0;
+        let best = pollster::block_on(best_triangle(
+            &params,
+            &rows,
+            &mut SmallRng::seed_from_u64(42),
+            |_| seeds.next().unwrap().vertices,
+            async |generation, best| {
+                assert_eq!(generation, rounds);
+                rounds += 1;
+                let expected = if generation < 64 { small } else { large };
+                assert_eq!(best.unwrap().triangle, expected);
+                true
+            },
+        ));
+        assert_eq!(rounds, params.num_generations);
+        assert_eq!(seeds.next(), None);
+        assert_eq!(best.unwrap().triangle, large);
+    }
 
     #[test]
     fn refinement_recovers_a_corner_one_grid_step_away() {

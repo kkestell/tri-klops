@@ -1,9 +1,16 @@
 use std::{path::Path, sync::Mutex, time::Instant};
-use triklops::algo::{AlgorithmParams, Progress, run_algorithm};
+use triklops::algo::{AlgorithmParams, Progress, SearchMode, run_algorithm};
 
 fn measure(name: &str, seed: u64, mut params: AlgorithmParams, directory: &Path) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("examples/{name}.jpg"));
-    let reference = image::open(path).unwrap().to_rgb8();
+    let reference = image::open(path)
+        .unwrap()
+        .resize(
+            params.image_size,
+            params.image_size,
+            image::imageops::FilterType::Lanczos3,
+        )
+        .into_rgb8();
     let output = directory.join(format!("{name}-{seed}-{}.svg", params.num_triangles));
     params.seed = Some(seed);
     let progress = Mutex::new(Progress::default());
@@ -32,10 +39,11 @@ fn main() {
     } else {
         let params = AlgorithmParams {
             num_triangles: 32,
+            image_size: 256,
             num_generations: 12,
             population_size: 48,
             num_selected: 12,
-            ..Default::default()
+            ..AlgorithmParams::for_mode(SearchMode::Greedy)
         };
         for seed in [7, 42, 101] {
             for name in ["castle", "kanagawa", "tri-klops", "zardoz"] {

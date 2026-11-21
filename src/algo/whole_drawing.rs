@@ -9,8 +9,8 @@ use rand::{RngExt, rngs::SmallRng};
 use std::sync::Mutex;
 
 const SHAPE_GENERATIONS: usize = 32;
-const REFINE_INTERVAL: usize = 4;
-const MAX_RADIUS_SHIFT: u32 = 6;
+const REFINE_INTERVAL: usize = 16;
+const MAX_RADIUS_SHIFT: u32 = 8;
 
 fn nudge(
     mut vertices: Vertices,

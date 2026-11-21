@@ -20,6 +20,7 @@ cargo run --release --locked
 Load a reference image and choose **Start processing**. When the run finishes, or when you stop it, Tri-Klops saves an SVG next to the reference image using the same filename stem. An existing SVG at that path is replaced.
 
 Portrait, landscape, and square images keep their framing in the preview and exported SVG.
+The default processing canvas is 768 pixels on its longest side.
 
 ### Browser build
 
@@ -42,16 +43,18 @@ npx wrangler pages deploy target/web --project-name tri-klops --branch main
 
 ### Search modes
 
-**One at a time** (default) searches for the next triangle to add. Each accepted triangle stays in place.
+**One at a time** searches for the next triangle to add. Each accepted triangle stays in place. Longer searches start from fresh shapes several times per triangle and keep the best candidate found.
 
-**Whole drawing** adds triangles while regularly revisiting their shapes and colors. Once the drawing reaches the **Triangle limit**, the search focuses on improving existing triangles. It refits colors based on the visible parts of each triangle and frees slots taken by fully hidden triangles. Use the **Generations** slider under **Triangle limit** to set the search budget for the entire drawing. Click either slider’s number to enter an exact value. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
+**Whole drawing** (default) adds triangles while regularly revisiting their shapes and colors. Once the drawing reaches the **Triangle limit**, the search focuses on improving existing triangles. It refits colors based on the visible parts of each triangle and frees slots taken by fully hidden triangles. Use the **Generations** slider under **Triangle limit** to set the search budget for the entire drawing. Click either slider’s number to enter an exact value. The preview and saved SVG use the best drawing found, measured by mean squared RGB error.
 
 Each mode keeps its own search settings while the app is open.
 
 | Search mode | Generations | Population size | Selected | Mutation rate |
 | --- | ---: | ---: | ---: | ---: |
-| One at a time | 160 per triangle | 80 | 4 | 0.20 |
-| Whole drawing | 2,048 per drawing | 64 | 4 | 0.15 |
+| One at a time | 128 per triangle | 80 | 4 | 0.20 |
+| Whole drawing | 8,192 per drawing | 64 | 4 | 0.15 |
+
+The default triangle limit is 8,192.
 
 ### Shaping the triangles
 
